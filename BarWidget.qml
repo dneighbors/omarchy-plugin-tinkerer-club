@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import qs.Commons
 import qs.Ui
 
 BarWidget {
@@ -9,6 +10,12 @@ BarWidget {
   readonly property bool opened: panelItem ? panelItem.opened === true : false
   readonly property bool popoutSwitchClosing: panelItem ? panelItem.popoutSwitchClosing === true : false
   readonly property bool hasNew: panelItem ? panelItem.hasNew === true : false
+  readonly property int unreadCount: {
+    if (!panelItem || panelItem.unreadCount === undefined)
+      return 0
+    var n = Number(panelItem.unreadCount)
+    return isNaN(n) ? 0 : n
+  }
 
   property var panelItem: null
 
@@ -61,10 +68,36 @@ BarWidget {
     bar: root.bar
     // Lobster. Private-use-safe emoji escapes so the source survives patches.
     text: "\ud83e\udd9e"
-    tooltipText: root.opened ? "Close Tinkerer Club" : "Tinkerer Club"
+    tooltipText: root.opened
+      ? "Close Tinkerer Club"
+      : (root.unreadCount > 0 ? ("Tinkerer Club · " + root.unreadCount + " unread") : "Tinkerer Club")
 
     Rectangle {
-      visible: root.hasNew && !root.opened
+      id: unreadBadge
+      visible: root.unreadCount > 0 && !root.opened
+      anchors.right: parent.right
+      anchors.rightMargin: Style.space(1)
+      anchors.top: parent.top
+      anchors.topMargin: Style.space(3)
+      width: Math.max(countText.implicitWidth + Style.space(6), Style.space(12))
+      height: Style.space(12)
+      radius: height / 2
+      color: Color.accent
+
+      Text {
+        id: countText
+        textFormat: Text.PlainText
+        anchors.centerIn: parent
+        text: root.unreadCount > 99 ? "99+" : String(root.unreadCount)
+        font.family: Style.font.family
+        font.pixelSize: Math.max(8, Style.font.caption - Style.space(3))
+        font.bold: true
+        color: Color.background
+      }
+    }
+
+    Rectangle {
+      visible: root.hasNew && !root.opened && root.unreadCount <= 0
       width: 6
       height: 6
       radius: 3

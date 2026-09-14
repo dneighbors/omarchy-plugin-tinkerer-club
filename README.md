@@ -26,7 +26,7 @@ Issue a key from Tinkerer Club. The Raycast extension uses the same key and the 
 
 Click the lobster in the bar to open or close the panel. Escape closes it.
 
-Click a post to open it in the browser. Refresh pulls the current feed. The bar shows a dot when something newer than your last open arrives.
+Click a post to open it in the browser. Refresh pulls the current feed. The bar shows a dot when something newer than your last open arrives. When the panel is closed and there are unread notifications, a count badge replaces that dot. The dot comes back when the count is 0.
 
 ```sh
 omarchy bar move dneighbors.tinkerer-club --section right

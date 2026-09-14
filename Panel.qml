@@ -39,8 +39,9 @@ Panel {
   property string errorText: ""
   property string latestId: ""
   property string seenId: ""
+  property int unreadCount: 0
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
-  readonly property bool busy: statusProc.running || feedProc.running
+  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running
 
   function cmd(args) {
     var base = [root.script, "--base-url", String(root.baseUrl), "--limit", String(root.feedLimit)]
@@ -82,6 +83,13 @@ Panel {
     }
   }
 
+  function refreshUnread() {
+    if (!unreadProc.running) {
+      unreadProc.command = root.cmd(["notifications", "unread"])
+      unreadProc.running = true
+    }
+  }
+
   function checkStatus() {
     if (!statusProc.running) {
       statusProc.command = root.cmd(["status"])
@@ -102,6 +110,8 @@ Panel {
       errorText = data.error || "Add your Tinkerer Club API key."
     else if (errorText === "Add your Tinkerer Club API key.")
       errorText = ""
+    if (root.configured && !root.opened)
+      root.refreshUnread()
   }
 
   function applyFeed(data) {
@@ -119,6 +129,13 @@ Panel {
       latestId = String(posts[0].id || "")
     if (root.opened)
       markSeen()
+    if (root.configured && root.opened)
+      root.refreshUnread()
+  }
+
+  function applyUnread(data) {
+    if (data && data.ok === true && typeof data.count === "number" && isFinite(data.count) && data.count >= 0)
+      unreadCount = Math.floor(data.count)
   }
 
   onOpenedChanged: {
@@ -155,6 +172,17 @@ Panel {
 
   Process { id: browserProc }
 
+  Process {
+    id: unreadProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyUnread(data)
+      }
+    }
+  }
+
   Timer {
     interval: Math.max(1, root.refreshMinutes) * 60000
     running: true
@@ -167,6 +195,8 @@ Panel {
         feedProc.command = root.cmd(["feed"])
         feedProc.running = true
       }
+      if (root.configured && !root.opened)
+        root.refreshUnread()
     }
   }
 
