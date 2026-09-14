@@ -23,6 +23,8 @@ Commands:
   feed                   Recent timeline posts as JSON.
   notifications unread   Unread notification count as JSON.
   notifications list     Recent notifications as JSON.
+  notifications mark-read ID  Mark one notification read.
+  notifications mark-all-read Mark all notifications read.
 EOF
 }
 
@@ -279,6 +281,15 @@ unwrap_notifications() {
   '
 }
 
+unwrap_ok() {
+  jq -c --arg id "${1:-}" '
+    if type == "object" and .ok == false then .
+    elif $id != "" then {ok: true, id: $id}
+    else {ok: true}
+    end
+  '
+}
+
 cmd_status() {
   local path="$key_file"
   if [[ -f "$path" && -s "$path" ]]; then
@@ -311,6 +322,24 @@ cmd_notifications_list() {
   fi
   payload="$(api_call "notification/list" "$(jq -nc --argjson limit "$n" '{limit:$limit}')")"
   printf '%s' "$payload" | unwrap_notifications
+}
+
+cmd_notifications_mark_read() {
+  local id="${1:-}"
+  id="${id#"${id%%[![:space:]]*}"}"
+  id="${id%"${id##*[![:space:]]}"}"
+  if [[ -z "$id" ]]; then
+    fail "A notification id is required." "Pass the id as: notifications mark-read ID"
+  fi
+  local payload
+  payload="$(api_call "notification/markRead" "$(jq -nc --arg id "$id" '{id:$id}')")"
+  printf '%s' "$payload" | unwrap_ok "$id"
+}
+
+cmd_notifications_mark_all_read() {
+  local payload
+  payload="$(api_call "notification/markAllRead" '{}')"
+  printf '%s' "$payload" | unwrap_ok
 }
 
 while [[ $# -gt 0 ]]; do
@@ -352,6 +381,8 @@ case "$command" in
     case "${2:-}" in
       unread) cmd_notifications_unread ;;
       list) cmd_notifications_list ;;
+      mark-read) cmd_notifications_mark_read "${3:-}" ;;
+      mark-all-read) cmd_notifications_mark_all_read ;;
       "") fail "Unknown command: notifications" ;;
       *) fail "Unknown command: $2" ;;
     esac

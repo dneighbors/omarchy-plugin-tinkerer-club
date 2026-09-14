@@ -56,12 +56,12 @@ development_status:
 
   # ============================================
   # Epic 2: Notifications
-  # Status: IN-PROGRESS
+  # Status: DONE
   # ============================================
-  epic-2: in-progress
+  epic-2: done
   2-1-unread-count: done                      # Story: 2.1 | BenjiID: 9e45c450-5a32-440f-af1f-f737d03f091f
   2-2-notification-list: done                 # Story: 2.2 | BenjiID: a3d95cad-4ae0-427f-8d89-25971ccccd7c
-  2-3-mark-read: backlog                      # Story: 2.3 | BenjiID: dccdd7b0-590d-44f7-89e0-0078b7471c4f
+  2-3-mark-read: done                         # Story: 2.3 | BenjiID: dccdd7b0-590d-44f7-89e0-0078b7471c4f
   epic-2-retrospective: optional
 
   # ============================================

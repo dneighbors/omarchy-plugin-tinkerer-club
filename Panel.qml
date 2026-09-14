@@ -40,11 +40,12 @@ Panel {
   property string latestId: ""
   property string seenId: ""
   property int unreadCount: 0
+  property bool pendingUnread: false
   property string panelView: "feed"
   property var notifications: []
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
   readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running : feedProc.running
-  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running
+  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running
 
   function cmd(args) {
     var base = [root.script, "--base-url", String(root.baseUrl), "--limit", String(root.feedLimit)]
@@ -103,10 +104,12 @@ Panel {
   }
 
   function refreshUnread() {
-    if (!unreadProc.running) {
-      unreadProc.command = root.cmd(["notifications", "unread"])
-      unreadProc.running = true
+    if (unreadProc.running) {
+      pendingUnread = true
+      return
     }
+    unreadProc.command = root.cmd(["notifications", "unread"])
+    unreadProc.running = true
   }
 
   function checkStatus() {
@@ -120,6 +123,42 @@ Panel {
     if (!url) return
     browserProc.command = ["xdg-open", String(url)]
     browserProc.running = true
+  }
+
+  function markRead(id) {
+    var trimmed = String(id === undefined || id === null ? "" : id).replace(/^\s+|\s+$/g, "")
+    if (trimmed === "")
+      return
+    if (!root.opened || root.panelView !== "notifications")
+      return
+    if (markReadProc.running)
+      return
+    markReadProc.command = root.cmd(["notifications", "mark-read", trimmed])
+    markReadProc.running = true
+  }
+
+  function markAllRead() {
+    if (!root.opened || root.panelView !== "notifications")
+      return
+    if (markAllReadProc.running)
+      return
+    markAllReadProc.command = root.cmd(["notifications", "mark-all-read"])
+    markAllReadProc.running = true
+  }
+
+  function applyMark(data) {
+    if (data && data.ok === true) {
+      if (root.panelView === "notifications") {
+        errorText = ""
+        statusHint = ""
+      }
+      root.refreshUnread()
+      return
+    }
+    if (data && data.ok !== true && root.panelView === "notifications" && root.opened) {
+      errorText = data.error || "Could not mark notifications read."
+      statusHint = data.hint || ""
+    }
   }
 
   function applyStatus(data) {
@@ -159,6 +198,10 @@ Panel {
   function applyUnread(data) {
     if (data && data.ok === true && typeof data.count === "number" && isFinite(data.count) && data.count >= 0)
       unreadCount = Math.floor(data.count)
+    if (pendingUnread) {
+      pendingUnread = false
+      root.refreshUnread()
+    }
   }
 
   function applyNotifications(data) {
@@ -230,6 +273,28 @@ Panel {
         var data
         try { data = JSON.parse(text) } catch (e) { return }
         root.applyNotifications(data)
+      }
+    }
+  }
+
+  Process {
+    id: markReadProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyMark(data)
+      }
+    }
+  }
+
+  Process {
+    id: markAllReadProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyMark(data)
       }
     }
   }
@@ -324,6 +389,24 @@ Panel {
                 root.panelView = "notifications"
                 root.refreshNotifications()
               }
+            }
+          }
+
+          Item { Layout.fillWidth: true }
+        }
+
+        RowLayout {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.panelView === "notifications" && root.unreadCount > 0
+
+          WidgetButton {
+            bar: root.bar
+            text: "Mark all read"
+            enabled: !markAllReadProc.running
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton)
+                root.markAllRead()
             }
           }
 
@@ -458,7 +541,7 @@ Panel {
               delegate: Item {
                 required property var modelData
                 width: notificationsColumn.width
-                height: noteRow.implicitHeight + Style.space(8)
+                height: Math.max(noteRow.implicitHeight, markReadBtn.implicitHeight) + Style.space(8)
 
                 Rectangle {
                   anchors.fill: parent
@@ -470,18 +553,36 @@ Panel {
 
                 MouseArea {
                   id: noteMouse
-                  anchors.fill: parent
+                  anchors.left: parent.left
+                  anchors.top: parent.top
+                  anchors.bottom: parent.bottom
+                  anchors.right: markReadBtn.left
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.openUrl(modelData.url)
                 }
 
+                WidgetButton {
+                  id: markReadBtn
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.rightMargin: Style.space(8)
+                  bar: root.bar
+                  text: "Mark read"
+                  enabled: !markReadProc.running
+                  onPressed: function(buttonCode) {
+                    if (buttonCode === Qt.LeftButton)
+                      root.markRead(String(modelData.id || ""))
+                  }
+                }
+
                 Column {
                   id: noteRow
                   anchors.left: parent.left
-                  anchors.right: parent.right
+                  anchors.right: markReadBtn.left
                   anchors.verticalCenter: parent.verticalCenter
-                  anchors.margins: Style.space(8)
+                  anchors.leftMargin: Style.space(8)
+                  anchors.rightMargin: Style.space(8)
                   spacing: Style.space(2)
 
                   Text {

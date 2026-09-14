@@ -488,7 +488,7 @@ assert_limit_body "limit 99 posts 50" 50
 assert_post_list "limit 99"
 assert_no_key "limit 99" "$out" "$err"
 
-# --- usage names list + unread; no mark --------------------------------------
+# --- usage names list + unread; kebab mark-read may appear (Task 2.7) --------
 
 if "$tinkerer" -h 2>/dev/null | grep -q 'notifications list'; then
   pass "usage lists notifications list"
@@ -500,10 +500,12 @@ if "$tinkerer" -h 2>/dev/null | grep -q 'notifications unread'; then
 else
   bad "usage lists notifications unread"
 fi
-if "$tinkerer" -h 2>/dev/null | grep -Eq 'notifications (mark|markRead|markAllRead)'; then
-  bad "usage invented mark commands"
+# Helper contains notification/markRead; usage may list kebab-case mark-*.
+# camelCase markRead / markAllRead stay unknown commands (not usage lines).
+if "$tinkerer" -h 2>/dev/null | grep -Eq 'notifications markRead|notifications markAllRead'; then
+  bad "usage lists camelCase mark commands"
 else
-  pass "usage has no mark commands"
+  pass "usage has no camelCase mark commands"
 fi
 
 if grep -q 'status)' "$tinkerer" && grep -q 'feed)' "$tinkerer"; then
@@ -550,10 +552,33 @@ if grep -q 'No notifications yet.' "$panel"; then
 else
   bad "Panel empty notifications copy"
 fi
-if grep -qE 'markRead|markAllRead' "$tinkerer" "$panel" "$bar"; then
-  bad "mark-read strings leaked"
+# Task 2.7: BarWidget stays mark-free. Opening/list must not start mark procs.
+if grep -qE 'markRead|markAllRead' "$bar"; then
+  bad "BarWidget mark-read strings"
 else
-  pass "no mark-read strings"
+  pass "BarWidget has no mark-read strings"
+fi
+if python3 - "$panel" <<'PY'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1]).read_text()
+opened = p[p.find("onOpenedChanged"):p.find("Process {")]
+rn = p.find("function refreshNotifications")
+refresh_n = p[rn:p.find("function refresh()", rn)] if rn != -1 else ""
+an = p.find("function applyNotifications")
+apply_n = p[an:p.find("onOpenedChanged")] if an != -1 else ""
+banned = (
+    "markReadProc.running = true",
+    "markAllReadProc.running = true",
+    '["notifications", "mark-read"',
+    '["notifications", "mark-all-read"',
+)
+ok = all(s not in opened and s not in refresh_n and s not in apply_n for s in banned)
+sys.exit(0 if ok else 1)
+PY
+then
+  pass "Panel list path does not start mark procs"
+else
+  bad "Panel list path does not start mark procs"
 fi
 if grep -q 'property int unreadCount: 0' "$panel" && grep -q 'function refreshUnread' "$panel"; then
   pass "Panel unread contract remains"

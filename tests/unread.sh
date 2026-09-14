@@ -344,10 +344,12 @@ if "$tinkerer" -h 2>/dev/null | grep -q 'notifications list'; then
 else
   bad "usage lists notifications list"
 fi
-if "$tinkerer" -h 2>/dev/null | grep -Eq 'notifications (mark|markRead|markAllRead)'; then
-  bad "usage invented mark commands"
+# Task 2.7: kebab-case mark-read / mark-all-read may appear in usage.
+# camelCase markRead / markAllRead stay banned.
+if "$tinkerer" -h 2>/dev/null | grep -Eq 'notifications markRead|notifications markAllRead'; then
+  bad "usage lists camelCase mark commands"
 else
-  pass "usage has no mark commands"
+  pass "usage has no camelCase mark commands"
 fi
 
 if grep -q 'status)' "$tinkerer" && grep -q 'feed)' "$tinkerer"; then
