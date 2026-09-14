@@ -60,8 +60,11 @@ That removes the plugin checkout. It does not delete your API key file.
 
 ## Develop
 
+BMAD Method is installed (`_bmad/`, skills in `.agents/skills` and `.claude/skills`). Planning output goes in `_bmad-output/`. Start with `bmad-help` if you want the next workflow.
+
 ```sh
 omarchy plugin validate .
+npx bmad-method@latest status
 ```
 
 QML changes under `~/.config/omarchy/plugins/dneighbors.tinkerer-club/` reload on save. Force discovery with:
