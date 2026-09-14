@@ -60,7 +60,15 @@ That removes the plugin checkout. It does not delete your API key file.
 
 ## Develop
 
-BMAD Method is installed (`_bmad/`, skills in `.agents/skills` and `.claude/skills`). Planning output goes in `_bmad-output/`. Start with `bmad-help` if you want the next workflow.
+BMAD Method is installed. Write epics in `_bmad-output/planning-artifacts/epics.md` and status in `_bmad-output/implementation-artifacts/sprint-status.yaml`. Benji list is Products -> Omarchy Plugins -> Tinkerer Club. Map: `docs/benji-map.yaml`.
+
+Add a story: append it to `epics.md` and `epics.source.yaml`, then:
+
+```sh
+node ~/Public/domain-buildplans/scripts/benji/benji_sync.mjs _bmad-output/planning-artifacts/epics.source.yaml
+```
+
+Paste the new Benji todo id onto the story and into `sprint-status.yaml`.
 
 ```sh
 omarchy plugin validate .
