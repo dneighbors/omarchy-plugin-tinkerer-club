@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "id": "dneighbors.tinkerer-club",
+  "name": "Tinkerer Club",
+  "version": "0.1.0",
+  "author": "Derek Neighbors",
+  "license": "MIT",
+  "homepage": "https://github.com/dneighbors/omarchy-plugin-tinkerer-club",
+  "description": "Tinkerer Club feed in the Omarchy bar: recent posts, articles, and a one-click jump into the club.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Tinkerer Club",
+    "description": "Read the Tinkerer Club feed from the bar",
+    "category": "Social",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "apiKeyFile": "",
+      "baseUrl": "https://app.tinkerer.club",
+      "feedLimit": 20,
+      "panelWidth": 380,
+      "refreshMinutes": 5
+    },
+    "schema": [
+      {
+        "key": "apiKeyFile",
+        "type": "path",
+        "label": "API key file",
+        "defaultValue": "",
+        "description": "File that contains your Tinkerer Club member API key on one line. Empty uses ~/.config/omarchy/secrets/tinkerer-club-api-key. Keep the key out of this repo and out of shell.json."
+      },
+      {
+        "key": "baseUrl",
+        "type": "string",
+        "label": "Platform URL",
+        "defaultValue": "https://app.tinkerer.club",
+        "description": "HTTPS origin for the Tinkerer Club API. Leave the default unless the club gave you another endpoint."
+      },
+      {
+        "key": "feedLimit",
+        "type": "integer",
+        "label": "Feed items",
+        "min": 5,
+        "max": 50,
+        "step": 5,
+        "defaultValue": 20,
+        "description": "How many recent posts to pull when the panel opens."
+      },
+      {
+        "key": "panelWidth",
+        "type": "integer",
+        "label": "Panel width",
+        "min": 300,
+        "max": 720,
+        "step": 20,
+        "defaultValue": 380,
+        "description": "In the shell's spacing units. Wider than the screen is trimmed to fit."
+      },
+      {
+        "key": "refreshMinutes",
+        "type": "integer",
+        "label": "Quiet refresh every",
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 5,
+        "description": "Minutes. The bar uses this only to notice new activity. Opening the panel always fetches the current feed."
+      }
+    ]
+  }
+}

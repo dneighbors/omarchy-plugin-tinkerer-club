@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+# tinkerer: talk to Tinkerer Club for the bar widget.
+#
+# The QML never holds the member key. This script reads it from a file,
+# sends it only as x-api-key, and never prints it.
+
+set -euo pipefail
+
+readonly DEFAULT_BASE_URL="https://app.tinkerer.club"
+readonly DEFAULT_KEY_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/secrets/tinkerer-club-api-key"
+readonly USER_AGENT="omarchy-plugin-tinkerer-club/0.1.0 (+https://github.com/dneighbors/omarchy-plugin-tinkerer-club)"
+
+base_url="$DEFAULT_BASE_URL"
+key_file="$DEFAULT_KEY_FILE"
+feed_limit=20
+
+usage() {
+  cat <<'EOF'
+Usage: tinkerer [--base-url URL] [--key-file PATH] [--limit N] <command>
+
+Commands:
+  status   Whether a key file exists. Never prints the key.
+  feed     Recent timeline posts as JSON.
+EOF
+}
+
+json_error() {
+  local error="$1"
+  local hint="${2:-}"
+  jq -nc --arg error "$error" --arg hint "$hint" \
+    '{ok:false, error:$error, hint:$hint}'
+}
+
+fail() {
+  json_error "$1" "${2:-}"
+  exit 0
+}
+
+validate_base_url() {
+  local value="$1"
+  local scheme host
+
+  case "$value" in
+    https://*|http://*) ;;
+    *) fail "The Tinkerer Club base URL is invalid." "Use an https origin, such as https://app.tinkerer.club." ;;
+  esac
+
+  scheme="${value%%://*}"
+  host="${value#*://}"
+  host="${host%%/*}"
+  host="${host%%:*}"
+
+  if [[ "$scheme" == "http" ]]; then
+    case "$host" in
+      localhost|127.0.0.1|[::1]) ;;
+      *) fail "The Tinkerer Club base URL must use HTTPS." "HTTP is allowed only for localhost." ;;
+    esac
+  elif [[ "$scheme" != "https" ]]; then
+    fail "The Tinkerer Club base URL must use HTTPS."
+  fi
+
+  printf '%s' "${value%/}"
+}
+
+read_api_key() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    fail "Add your Tinkerer Club API key." "Write the raw member key to ${path}."
+  fi
+  if [[ ! -r "$path" ]]; then
+    fail "The API key file is not readable." "Check permissions on ${path}."
+  fi
+
+  local key
+  key="$(tr -d '\r' <"$path" | sed -n '1p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  if [[ -z "$key" ]]; then
+    fail "The API key file is empty." "Put the raw member key on the first line of ${path}."
+  fi
+  printf '%s' "$key"
+}
+
+api_call() {
+  local procedure="$1"
+  local body="$2"
+  local origin key url response http_code payload
+
+  origin="$(validate_base_url "$base_url")"
+  key="$(read_api_key "$key_file")"
+  url="${origin}/api/v1/${procedure}"
+
+  response="$(
+    curl -sS -w '\n%{http_code}' \
+      --max-time 15 \
+      -X POST \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      -H "User-Agent: ${USER_AGENT}" \
+      -H "x-api-key: ${key}" \
+      --data "$body" \
+      "$url"
+  )" || fail "The network request failed." "curl could not reach ${origin}."
+
+  http_code="${response##*$'\n'}"
+  payload="${response%$'\n'*}"
+
+  if [[ "$http_code" == "401" || "$http_code" == "403" ]]; then
+    fail "Authentication failed." "Check the member API key file."
+  fi
+  if [[ "$http_code" != "200" && "$http_code" != "201" ]]; then
+    local message
+    message="$(
+      printf '%s' "$payload" | jq -r '
+        .error.message // .error // .message // empty
+      ' 2>/dev/null || true
+    )"
+    if [[ -z "$message" ]]; then
+      message="Tinkerer Club returned HTTP ${http_code}."
+    fi
+    fail "$message"
+  fi
+
+  if ! printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
+    fail "Tinkerer Club returned a non-JSON response."
+  fi
+
+  printf '%s' "$payload"
+}
+
+unwrap_items() {
+  jq -c --arg origin "$(validate_base_url "$base_url")" '
+    def unwrap:
+      if type == "object" then
+        if has("result") then .result | unwrap
+        elif has("data") then .data | unwrap
+        else . end
+      else . end;
+    def items:
+      (unwrap) as $p
+      | if ($p | type) == "array" then $p
+        elif ($p | type) == "object" then
+          ($p.items // $p.posts // $p.results // [])
+        else [] end;
+    def text($obj; $keys):
+      ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "";
+    def author($item):
+      ([$item.author, $item.user, $item.member] | map(select(type == "object")) | .[0] // {}) as $src
+      | {
+          name: (text($src; ["name","displayName","username"])
+            // text($item; ["authorName","username"])
+            // "Tinkerer"),
+          username: (text($src; ["username","handle"]))
+        };
+    def resolve($value):
+      if ($value | type) != "string" or $value == "" then empty
+      else
+        if ($value | test("^https?://")) then $value
+        else ($origin + "/" + ($value | ltrimstr("/"))) end
+      end;
+    {
+      ok: true,
+      posts: [
+        items[]
+        | select(type == "object")
+        | . as $item
+        | (text($item; ["id","postId"])) as $id
+        | select($id != "")
+        | author($item) as $author
+        | (text($item; ["type","kind"]) // "POST") as $type
+        | {
+            id: $id,
+            type: $type,
+            title: text($item; ["title","headline"]),
+            content: (
+              text($item; ["content","body","description","summary"])
+              // (if $type == "MEMBER_JOINED" then ($author.name + " joined Tinkerer Club.") else "" end)
+            ),
+            author: $author.name,
+            username: $author.username,
+            publishedAt: text($item; ["publishedAt","createdAt","updatedAt"]),
+            commentCount: ($item.commentCount // $item.commentsCount // $item.replyCount // 0),
+            reactionCount: ($item.reactionCount // $item.likeCount // $item.reactionsCount // 0),
+            url: (
+              [text($item; ["href","url","webUrl","permalink"])]
+              | map(resolve(.))
+              | .[0] // ($origin + "/posts/" + $id)
+            )
+          }
+      ]
+    }
+  '
+}
+
+cmd_status() {
+  local path="$key_file"
+  if [[ -f "$path" && -s "$path" ]]; then
+    jq -nc --arg file "$path" '{ok:true, configured:true, apiKeyFile:$file}'
+  else
+    jq -nc --arg file "$path" \
+      '{ok:true, configured:false, apiKeyFile:$file, error:"Add your Tinkerer Club API key.", hint:("Write the raw member key to " + $file + ".")}'
+  fi
+}
+
+cmd_feed() {
+  local payload
+  payload="$(api_call "post/timeline" "$(jq -nc --argjson limit "$feed_limit" '{limit:$limit, supportsSparsePages:false}')")"
+  printf '%s' "$payload" | unwrap_items
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --base-url)
+      base_url="${2:-}"
+      shift 2
+      ;;
+    --key-file)
+      key_file="${2:-}"
+      shift 2
+      ;;
+    --limit)
+      feed_limit="${2:-20}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      fail "Unknown option: $1"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+command="${1:-}"
+case "$command" in
+  status) cmd_status ;;
+  feed) cmd_feed ;;
+  "") usage; exit 2 ;;
+  *) fail "Unknown command: $command" ;;
+esac

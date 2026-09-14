@@ -1,0 +1,10 @@
+# Local secrets and scratch. The API key lives outside this tree.
+*.local.*
+*api-key*
+*apikey*
+*token*
+.env
+.env.*
+secrets/
+.cache/
+*.log

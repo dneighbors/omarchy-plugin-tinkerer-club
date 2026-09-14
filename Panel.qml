@@ -1,0 +1,347 @@
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Io
+import qs.Commons
+import qs.Ui
+
+// Tinkerer Club feed popup. The member key stays in a file; bin/tinkerer
+// is the only thing that reads it.
+Panel {
+  id: root
+  moduleName: "dneighbors.tinkerer-club"
+  ipcTarget: "dneighbors.tinkerer-club"
+  manageIpc: false
+
+  property var anchorItem: null
+  property var hostWidget: null
+  readonly property var barIdentity: hostWidget || root
+
+  readonly property string script:
+    Qt.resolvedUrl("bin/tinkerer").toString().replace(/^file:\/\//, "")
+
+  readonly property string apiKeyFile: setting("apiKeyFile", "")
+  readonly property string baseUrl: setting("baseUrl", "https://app.tinkerer.club")
+  readonly property int feedLimit: setting("feedLimit", 20)
+  readonly property int panelWidth: setting("panelWidth", 380)
+  readonly property int refreshMinutes: setting("refreshMinutes", 5)
+
+  readonly property color contentForeground: bar ? bar.foreground : Color.foreground
+  readonly property color mutedForeground: Color.muted
+  readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property int listMaxHeight: Style.space(420)
+
+  property var posts: []
+  property bool configured: false
+  property string statusHint: ""
+  property string errorText: ""
+  property string latestId: ""
+  property string seenId: ""
+  readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
+  readonly property bool busy: statusProc.running || feedProc.running
+
+  function cmd(args) {
+    var base = [root.script, "--base-url", String(root.baseUrl), "--limit", String(root.feedLimit)]
+    if (root.apiKeyFile !== "")
+      base = base.concat(["--key-file", String(root.apiKeyFile)])
+    return base.concat(args)
+  }
+
+  function plain(s) {
+    return String(s === undefined || s === null ? "" : s).replace(/[<>]/g, "")
+  }
+
+  function snippet(s, maxLen) {
+    var text = String(s === undefined || s === null ? "" : s).replace(/\s+/g, " ").trim()
+    if (text.length <= maxLen) return text
+    return text.slice(0, maxLen - 1) + "\u2026"
+  }
+
+  function relativeTime(value) {
+    var stamp = Date.parse(value)
+    if (!isFinite(stamp)) return ""
+    var seconds = Math.round((Date.now() - stamp) / 1000)
+    if (seconds < 60) return "just now"
+    var minutes = Math.round(seconds / 60)
+    if (minutes < 60) return minutes + "m"
+    var hours = Math.round(minutes / 60)
+    if (hours < 24) return hours + "h"
+    return Math.round(hours / 24) + "d"
+  }
+
+  function markSeen() {
+    if (latestId !== "") seenId = latestId
+  }
+
+  function refresh() {
+    if (!feedProc.running) {
+      feedProc.command = root.cmd(["feed"])
+      feedProc.running = true
+    }
+  }
+
+  function checkStatus() {
+    if (!statusProc.running) {
+      statusProc.command = root.cmd(["status"])
+      statusProc.running = true
+    }
+  }
+
+  function openUrl(url) {
+    if (!url) return
+    browserProc.command = ["xdg-open", String(url)]
+    browserProc.running = true
+  }
+
+  function applyStatus(data) {
+    configured = data.configured === true
+    statusHint = data.hint || ""
+    if (data.configured !== true)
+      errorText = data.error || "Add your Tinkerer Club API key."
+    else if (errorText === "Add your Tinkerer Club API key.")
+      errorText = ""
+  }
+
+  function applyFeed(data) {
+    if (data.ok !== true) {
+      errorText = data.error || "Could not load the feed."
+      statusHint = data.hint || ""
+      configured = data.error !== "Add your Tinkerer Club API key." ? configured : false
+      return
+    }
+    configured = true
+    errorText = ""
+    statusHint = ""
+    posts = data.posts || []
+    if (posts.length)
+      latestId = String(posts[0].id || "")
+    if (root.opened)
+      markSeen()
+  }
+
+  onOpenedChanged: {
+    if (opened) {
+      if (configured) refresh()
+      else checkStatus()
+      markSeen()
+    }
+  }
+
+  Process {
+    id: statusProc
+    command: root.cmd(["status"])
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyStatus(data)
+        if (root.configured && root.opened) root.refresh()
+      }
+    }
+  }
+
+  Process {
+    id: feedProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyFeed(data)
+      }
+    }
+  }
+
+  Process { id: browserProc }
+
+  Timer {
+    interval: Math.max(1, root.refreshMinutes) * 60000
+    running: true
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: {
+      if (root.opened) root.refresh()
+      else root.checkStatus()
+      if (root.configured && !root.opened && !feedProc.running) {
+        feedProc.command = root.cmd(["feed"])
+        feedProc.running = true
+      }
+    }
+  }
+
+  KeyboardPanel {
+    id: panel
+    anchorItem: root.anchorItem
+    owner: root.barIdentity
+    bar: root.bar
+    open: root.opened
+    focusTarget: keyCatcher
+    contentWidth: panel.fittedContentWidth(Style.space(root.panelWidth))
+    contentHeight: panel.fittedContentHeight(body.implicitHeight)
+
+    PanelKeyCatcher {
+      id: keyCatcher
+      anchors.fill: parent
+      onCloseRequested: root.close()
+      onTabRequested: function(direction) {
+        if (root.bar && typeof root.bar.switchPanelFrom === "function")
+          root.bar.switchPanelFrom(root.barIdentity, direction)
+      }
+
+      Column {
+        id: body
+        width: parent.width
+        spacing: Style.space(10)
+
+        RowLayout {
+          width: parent.width
+          spacing: Style.space(8)
+
+          Text {
+            text: "Tinkerer Club"
+            color: root.contentForeground
+            font.family: root.contentFontFamily
+            font.pixelSize: Style.font.subtitle
+            font.bold: true
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+          }
+
+          WidgetButton {
+            bar: root.bar
+            text: root.busy ? "\u2026" : "Refresh"
+            enabled: !root.busy
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton) root.refresh()
+            }
+          }
+        }
+
+        Text {
+          width: parent.width
+          visible: root.errorText !== ""
+          text: root.plain(root.errorText)
+          color: Color.urgent
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.body
+          wrapMode: Text.WordWrap
+        }
+
+        Text {
+          width: parent.width
+          visible: root.statusHint !== ""
+          text: root.plain(root.statusHint)
+          color: root.mutedForeground
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.bodySmall
+          wrapMode: Text.WordWrap
+        }
+
+        Flickable {
+          id: feedFlick
+          width: parent.width
+          height: Math.min(feedColumn.implicitHeight, root.listMaxHeight)
+          contentWidth: width
+          contentHeight: feedColumn.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          flickableDirection: Flickable.VerticalFlick
+          visible: root.posts.length > 0
+
+          Column {
+            id: feedColumn
+            width: feedFlick.width
+            spacing: Style.space(6)
+
+            Repeater {
+              model: root.posts
+
+              delegate: Item {
+                required property var modelData
+                width: feedColumn.width
+                height: row.implicitHeight + Style.space(8)
+
+                Rectangle {
+                  anchors.fill: parent
+                  radius: Style.space(4)
+                  color: rowMouse.containsMouse
+                    ? Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+                    : "transparent"
+                }
+
+                MouseArea {
+                  id: rowMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openUrl(modelData.url)
+                }
+
+                Column {
+                  id: row
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.margins: Style.space(8)
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    text: root.plain(modelData.author || "Tinkerer")
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: root.plain(root.snippet(modelData.title || modelData.content || "Untitled", 90))
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: root.plain([
+                      root.relativeTime(modelData.publishedAt),
+                      modelData.commentCount ? (modelData.commentCount + " comments") : "",
+                      modelData.reactionCount ? (modelData.reactionCount + " reactions") : ""
+                    ].filter(function(part) { return part }).join(" \u00b7 "))
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        Text {
+          width: parent.width
+          visible: root.configured && root.posts.length === 0 && !root.busy && root.errorText === ""
+          text: "No posts yet."
+          color: root.mutedForeground
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        WidgetButton {
+          width: parent.width
+          bar: root.bar
+          text: "Open Tinkerer Club"
+          onPressed: function(buttonCode) {
+            if (buttonCode === Qt.LeftButton) root.openUrl(root.baseUrl)
+          }
+        }
+      }
+    }
+  }
+}
