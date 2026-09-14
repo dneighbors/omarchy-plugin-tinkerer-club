@@ -339,10 +339,15 @@ if "$tinkerer" -h 2>/dev/null | grep -q 'notifications unread'; then
 else
   bad "usage lists notifications unread"
 fi
-if "$tinkerer" -h 2>/dev/null | grep -Eq 'notifications (list|mark)'; then
-  bad "usage invented other notifications commands"
+if "$tinkerer" -h 2>/dev/null | grep -q 'notifications list'; then
+  pass "usage lists notifications list"
 else
-  pass "usage has no extra notifications commands"
+  bad "usage lists notifications list"
+fi
+if "$tinkerer" -h 2>/dev/null | grep -Eq 'notifications (mark|markRead|markAllRead)'; then
+  bad "usage invented mark commands"
+else
+  pass "usage has no mark commands"
 fi
 
 if grep -q 'status)' "$tinkerer" && grep -q 'feed)' "$tinkerer"; then

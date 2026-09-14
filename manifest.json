@@ -49,7 +49,7 @@
         "max": 50,
         "step": 5,
         "defaultValue": 20,
-        "description": "How many recent posts to pull when the panel opens."
+        "description": "How many recent posts and notifications to pull for the first page."
       },
       {
         "key": "panelWidth",

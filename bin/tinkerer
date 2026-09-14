@@ -22,6 +22,7 @@ Commands:
   status                 Whether a key file exists. Never prints the key.
   feed                   Recent timeline posts as JSON.
   notifications unread   Unread notification count as JSON.
+  notifications list     Recent notifications as JSON.
 EOF
 }
 
@@ -216,6 +217,68 @@ unwrap_count() {
   ' 2>/dev/null || fail "Tinkerer Club returned no unread count."
 }
 
+unwrap_notifications() {
+  jq -c --arg origin "$(validate_base_url "$base_url")" '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          elif has("json") then .json | unwrap
+          else . end
+        else . end;
+      def text($obj; $keys):
+        ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "";
+      def sender($item):
+        ([$item.sender, $item.actor, $item.from, $item.user, $item.member, $item.author]
+          | map(select(type == "object")) | .[0] // {}) as $src
+        | text($src; ["name","displayName","username","handle"]) as $nested
+        | text($item; ["senderName","actorName","fromName","authorName"]) as $flat
+        | if $nested != "" then $nested
+          elif $flat != "" then $flat
+          else "Tinkerer" end;
+      def resolve($value):
+        if ($value | type) != "string" or $value == "" then empty
+        else
+          if ($value | test("^https?://")) then $value
+          elif ($value | test("^[a-zA-Z][a-zA-Z0-9+.-]*:")) then empty
+          else ($origin + "/" + ($value | ltrimstr("/"))) end
+        end;
+      def item_url($item):
+        (text($item; ["href","url","webUrl","permalink","targetUrl","link"])) as $direct
+        | (if ($item.target | type) == "object" then
+             text($item.target; ["href","url","webUrl","permalink","targetUrl","link"])
+           else "" end) as $nested
+        | ([ $direct, $nested ] | map(select(. != "")) | .[0] // "") as $raw
+        | ([$raw] | map(resolve(.)) | .[0] // "");
+      def items:
+        (unwrap) as $p
+        | if ($p | type) == "array" then $p
+          elif ($p | type) == "object" then
+            ($p.items // $p.notifications // $p.results // [])
+          else [] end;
+      {
+        ok: true,
+        notifications: [
+          items[]
+          | select(type == "object")
+          | . as $item
+          | (text($item; ["id","notificationId"])) as $id
+          | select($id != "")
+          | {
+              id: $id,
+              sender: sender($item),
+              title: (text($item; ["title","headline","message","body","content","text","summary"]) | if . == "" then "Notification" else . end),
+              createdAt: text($item; ["createdAt","publishedAt","sentAt","timestamp","date","updatedAt"]),
+              url: item_url($item)
+            }
+        ]
+      }
+    end
+  '
+}
+
 cmd_status() {
   local path="$key_file"
   if [[ -f "$path" && -s "$path" ]]; then
@@ -236,6 +299,18 @@ cmd_notifications_unread() {
   local payload
   payload="$(api_call "notification/unreadCount" '{}')"
   printf '%s' "$payload" | unwrap_count
+}
+
+cmd_notifications_list() {
+  local n="$feed_limit"
+  local payload
+  if (( n < 1 )); then
+    n=1
+  elif (( n > 50 )); then
+    n=50
+  fi
+  payload="$(api_call "notification/list" "$(jq -nc --argjson limit "$n" '{limit:$limit}')")"
+  printf '%s' "$payload" | unwrap_notifications
 }
 
 while [[ $# -gt 0 ]]; do
@@ -276,6 +351,7 @@ case "$command" in
   notifications)
     case "${2:-}" in
       unread) cmd_notifications_unread ;;
+      list) cmd_notifications_list ;;
       "") fail "Unknown command: notifications" ;;
       *) fail "Unknown command: $2" ;;
     esac
