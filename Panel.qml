@@ -37,6 +37,10 @@ Panel {
   property bool configured: false
   property string statusHint: ""
   property string errorText: ""
+  property string feedErrorText: ""
+  property string feedStatusHint: ""
+  property string notificationsErrorText: ""
+  property string notificationsStatusHint: ""
   property string latestId: ""
   property string seenId: ""
   property int unreadCount: 0
@@ -46,6 +50,16 @@ Panel {
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
   readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running : feedProc.running
   readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running
+
+  function syncViewMessages() {
+    if (root.panelView === "notifications") {
+      errorText = notificationsErrorText
+      statusHint = notificationsStatusHint
+    } else {
+      errorText = feedErrorText
+      statusHint = feedStatusHint
+    }
+  }
 
   function cmd(args) {
     var base = [root.script, "--base-url", String(root.baseUrl), "--limit", String(root.feedLimit)]
@@ -149,6 +163,8 @@ Panel {
   function applyMark(data) {
     if (data && data.ok === true) {
       if (root.panelView === "notifications") {
+        notificationsErrorText = ""
+        notificationsStatusHint = ""
         errorText = ""
         statusHint = ""
       }
@@ -156,32 +172,47 @@ Panel {
       return
     }
     if (data && data.ok !== true && root.panelView === "notifications" && root.opened) {
-      errorText = data.error || "Could not mark notifications read."
-      statusHint = data.hint || ""
+      notificationsErrorText = data.error || "Could not mark notifications read."
+      notificationsStatusHint = data.hint || ""
+      errorText = notificationsErrorText
+      statusHint = notificationsStatusHint
     }
   }
 
   function applyStatus(data) {
     configured = data.configured === true
     statusHint = data.hint || ""
-    if (data.configured !== true)
+    feedStatusHint = statusHint
+    notificationsStatusHint = statusHint
+    if (data.configured !== true) {
       errorText = data.error || "Add your Tinkerer Club API key."
-    else if (errorText === "Add your Tinkerer Club API key.")
+      feedErrorText = errorText
+      notificationsErrorText = errorText
+    } else if (errorText === "Add your Tinkerer Club API key.") {
       errorText = ""
+      if (feedErrorText === "Add your Tinkerer Club API key.")
+        feedErrorText = ""
+      if (notificationsErrorText === "Add your Tinkerer Club API key.")
+        notificationsErrorText = ""
+    }
     if (root.configured && !root.opened)
       root.refreshUnread()
   }
 
   function applyFeed(data) {
     if (data.ok !== true) {
+      feedErrorText = data.error || "Could not load the feed."
+      feedStatusHint = data.hint || ""
       if (root.panelView === "feed") {
-        errorText = data.error || "Could not load the feed."
-        statusHint = data.hint || ""
+        errorText = feedErrorText
+        statusHint = feedStatusHint
       }
       configured = data.error !== "Add your Tinkerer Club API key." ? configured : false
       return
     }
     configured = true
+    feedErrorText = ""
+    feedStatusHint = ""
     if (root.panelView === "feed") {
       errorText = ""
       statusHint = ""
@@ -207,17 +238,25 @@ Panel {
   function applyNotifications(data) {
     if (data && data.ok === true && Array.isArray(data.notifications)) {
       root.notifications = data.notifications
+      notificationsErrorText = ""
+      notificationsStatusHint = ""
       if (root.panelView === "notifications") {
         errorText = ""
         statusHint = ""
       }
       return
     }
-    if (data && data.ok !== true && root.panelView === "notifications" && root.opened) {
-      errorText = data.error || "Could not load notifications."
-      statusHint = data.hint || ""
+    if (data && data.ok !== true && root.opened) {
+      notificationsErrorText = data.error || "Could not load notifications."
+      notificationsStatusHint = data.hint || ""
+      if (root.panelView === "notifications") {
+        errorText = notificationsErrorText
+        statusHint = notificationsStatusHint
+      }
     }
   }
+
+  onPanelViewChanged: root.syncViewMessages()
 
   onOpenedChanged: {
     if (opened) {
@@ -627,7 +666,7 @@ Panel {
 
         Text {
           width: parent.width
-          visible: root.panelView === "feed" && root.configured && root.posts.length === 0 && !root.busy && root.errorText === ""
+          visible: root.panelView === "feed" && root.configured && root.posts.length === 0 && !root.viewBusy && root.errorText === ""
           text: "No posts yet."
           color: root.mutedForeground
           font.family: root.contentFontFamily
@@ -636,7 +675,7 @@ Panel {
 
         Text {
           width: parent.width
-          visible: root.panelView === "notifications" && root.configured && root.notifications.length === 0 && !root.busy && root.errorText === ""
+          visible: root.panelView === "notifications" && root.configured && root.notifications.length === 0 && !root.viewBusy && root.errorText === ""
           text: "No notifications yet."
           color: root.mutedForeground
           font.family: root.contentFontFamily
