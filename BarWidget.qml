@@ -16,8 +16,25 @@ BarWidget {
     var n = Number(panelItem.unreadCount)
     return isNaN(n) ? 0 : n
   }
+  readonly property bool lockinLive: panelItem ? panelItem.lockinLive === true : false
+  readonly property int lockinRemainingMs: {
+    if (!panelItem || panelItem.lockinRemainingMs === undefined)
+      return 0
+    var n = Number(panelItem.lockinRemainingMs)
+    return isNaN(n) ? 0 : n
+  }
+  readonly property bool showSessionCue: lockinLive && !opened && unreadCount <= 0
 
   property var panelItem: null
+
+  function formatDuration(ms) {
+    if (!isFinite(ms) || ms < 0)
+      return "0:00"
+    var totalSec = Math.floor(ms / 1000)
+    var m = Math.floor(totalSec / 60)
+    var s = totalSec % 60
+    return m + ":" + (s < 10 ? "0" : "") + s
+  }
 
   function open() { if (panelItem) panelItem.open() }
   function close() { if (panelItem) panelItem.close() }
@@ -70,7 +87,11 @@ BarWidget {
     text: "\ud83e\udd9e"
     tooltipText: root.opened
       ? "Close Tinkerer Club"
-      : (root.unreadCount > 0 ? ("Tinkerer Club · " + root.unreadCount + " unread") : "Tinkerer Club")
+      : (root.unreadCount > 0
+          ? ("Tinkerer Club · " + root.unreadCount + " unread")
+          : (root.showSessionCue
+              ? ("Tinkerer Club · LockIn " + root.formatDuration(root.lockinRemainingMs) + " remaining")
+              : "Tinkerer Club"))
 
     Rectangle {
       id: unreadBadge
@@ -97,7 +118,33 @@ BarWidget {
     }
 
     Rectangle {
-      visible: root.hasNew && !root.opened && root.unreadCount <= 0
+      id: sessionCue
+      visible: root.showSessionCue
+      anchors.left: parent.left
+      anchors.leftMargin: Style.space(1)
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: Style.space(1)
+      height: Style.space(10)
+      width: sessionCueText.implicitWidth + Style.space(4)
+      radius: height / 2
+      color: Color.background
+      border.color: Color.accent
+      border.width: 1
+
+      Text {
+        id: sessionCueText
+        textFormat: Text.PlainText
+        anchors.centerIn: parent
+        text: root.formatDuration(root.lockinRemainingMs)
+        font.family: Style.font.family
+        font.pixelSize: Math.max(8, Style.font.caption - Style.space(3))
+        font.bold: true
+        color: Color.accent
+      }
+    }
+
+    Rectangle {
+      visible: root.hasNew && !root.opened && root.unreadCount <= 0 && !root.lockinLive
       width: 6
       height: 6
       radius: 3

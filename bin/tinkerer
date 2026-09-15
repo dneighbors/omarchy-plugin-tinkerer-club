@@ -25,6 +25,14 @@ Commands:
   notifications list     Recent notifications as JSON.
   notifications mark-read ID  Mark one notification read.
   notifications mark-all-read Mark all notifications read.
+  lockin state          LockIn room state as JSON.
+  lockin start [title]  Start a LockIn session (title max 160).
+  lockin finish ID      Finish a LockIn session by id.
+  lockin todos          LockIn checklist as JSON.
+  lockin todo-add TITLE Add a LockIn checklist item (client UUID).
+  lockin todo-done ID   Mark a LockIn todo complete.
+  lockin todo-update ID true|false  Set LockIn todo completed flag.
+  lockin todo-delete ID Delete a LockIn todo.
 EOF
 }
 
@@ -290,6 +298,96 @@ unwrap_ok() {
   '
 }
 
+unwrap_lockin_state() {
+  jq -c '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          elif has("json") then .json | unwrap
+          else . end
+        else . end;
+      def text($obj; $keys):
+        ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "";
+      def participant_name($p):
+        (if ($p.user | type) == "object" then
+           text($p.user; ["name","displayName","username"])
+         else "" end) as $nested
+        | if $nested != "" then $nested
+          else text($p; ["name","displayName","username"]) // "Tinkerer" end;
+      def normalize_current($c):
+        if ($c | type) != "object" then null
+        else (text($c; ["id"])) as $id
+        | if $id == "" then null
+          else {
+            id: $id,
+            title: text($c; ["title"]) // "LockIn",
+            startedAt: text($c; ["startedAt"]),
+            expiresAt: text($c; ["expiresAt"]),
+            automaticallyEnded: ($c.automaticallyEnded // false)
+          }
+          end
+        end;
+      def normalize_last($c):
+        normalize_current($c) as $base
+        | if $base == null then null
+          else
+            $base + (if text($c; ["endedAt"]) != "" then {endedAt: text($c; ["endedAt"])} else {} end)
+          end;
+      def participants_list($p):
+        if ($p | type) == "array" then $p
+        elif ($p | type) == "object" then
+          ($p.participants // $p.items // $p.results // [])
+        else [] end;
+      (unwrap) as $p
+      | (normalize_current($p.current // null)) as $current
+      | (participants_list($p)) as $raw_parts
+      | {
+          ok: true,
+          current: $current,
+          participants: [
+            $raw_parts[]
+            | select(type == "object")
+            | . as $item
+            | (text($item; ["id"])) as $id
+            | select($id != "")
+            | {
+                id: $id,
+                title: text($item; ["title"]) // "LockIn",
+                startedAt: text($item; ["startedAt"]),
+                expiresAt: text($item; ["expiresAt"]),
+                name: participant_name($item)
+              }
+          ],
+          serverNow: (
+            if ($p | type) == "object" then
+              text($p; ["serverNow","now","timestamp"])
+            else "" end
+          ),
+          onboarded: (
+            if ($p | type) == "object" and ($p.onboarded | type) == "boolean" then $p.onboarded
+            else false end
+          )
+        }
+      | . + (
+          if $current == null then
+            (
+              if ($p | type) == "object" then
+                ($p.lastEnd // $p.lastSession // $p.endedSession // null)
+              else null end
+            ) as $le
+            | if $le != null then
+                (normalize_last($le)) as $norm
+                | if $norm != null then {lastEnd: $norm} else {} end
+              else {} end
+          else {} end
+        )
+    end
+  '
+}
+
 cmd_status() {
   local path="$key_file"
   if [[ -f "$path" && -s "$path" ]]; then
@@ -342,6 +440,164 @@ cmd_notifications_mark_all_read() {
   printf '%s' "$payload" | unwrap_ok
 }
 
+cmd_lockin_state() {
+  local payload
+  payload="$(api_call "lockIn/state" '{}')"
+  printf '%s' "$payload" | unwrap_lockin_state
+}
+
+cmd_lockin_start() {
+  local title="" payload body
+  if (($# > 0)); then
+    title="$*"
+    title="${title#"${title%%[![:space:]]*}"}"
+    title="${title%"${title##*[![:space:]]}"}"
+    if ((${#title} > 160)); then
+      title="${title:0:160}"
+    fi
+  fi
+  if [[ -n "$title" ]]; then
+    body="$(jq -nc --arg title "$title" '{title:$title}')"
+  else
+    body='{}'
+  fi
+  payload="$(api_call "lockIn/start" "$body")"
+  printf '%s' "$payload" | unwrap_ok
+}
+
+cmd_lockin_finish() {
+  local id="${1:-}"
+  id="${id#"${id%%[![:space:]]*}"}"
+  id="${id%"${id##*[![:space:]]}"}"
+  if [[ -z "$id" ]]; then
+    fail "A LockIn session id is required." "Pass the id as: lockin finish ID"
+  fi
+  local payload
+  payload="$(api_call "lockIn/finish" "$(jq -nc --arg id "$id" '{id:$id}')")"
+  printf '%s' "$payload" | unwrap_ok
+}
+
+unwrap_lockin_todos() {
+  jq -c '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          elif has("json") then .json | unwrap
+          else . end
+        else . end;
+      def text($obj; $keys):
+        ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "";
+      def todos_list($p):
+        if ($p | type) == "array" then $p
+        elif ($p | type) == "object" then
+          ($p.todos // $p.items // $p.results // [])
+        else [] end;
+      def normalize_todo($t):
+        if ($t | type) != "object" then empty
+        else (text($t; ["id"])) as $id
+        | select($id != "")
+        | {
+            id: $id,
+            title: text($t; ["title"]),
+            completed: ($t.completed // false),
+            deleted: ($t.deleted // false),
+            createdAt: text($t; ["createdAt"])
+          }
+        end;
+      (unwrap) as $p
+      | {
+          ok: true,
+          todos: [
+            todos_list($p)[]
+            | normalize_todo(.)
+            | select(. != null and .deleted != true)
+          ]
+        }
+    end
+  '
+}
+
+new_todo_uuid() {
+  if [[ -n "${TINKERER_TODO_UUID:-}" ]]; then
+    printf '%s' "$TINKERER_TODO_UUID"
+    return 0
+  fi
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen
+    return 0
+  fi
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    tr -d '\n' </proc/sys/kernel/random/uuid
+    return 0
+  fi
+  fail "Could not generate a todo id." "Install uuidgen or use a Linux kernel with /proc/sys/kernel/random/uuid."
+}
+
+cmd_lockin_todos() {
+  local payload
+  payload="$(api_call "lockIn/todos" '{}')"
+  printf '%s' "$payload" | unwrap_lockin_todos
+}
+
+cmd_lockin_todo_add() {
+  local title="" payload id
+  if (($# > 0)); then
+    title="$*"
+    title="${title#"${title%%[![:space:]]*}"}"
+    title="${title%"${title##*[![:space:]]}"}"
+  fi
+  if [[ -z "$title" ]]; then
+    fail "A todo title is required." "Pass the title as: lockin todo-add TITLE"
+  fi
+  if ((${#title} > 200)); then
+    title="${title:0:200}"
+  fi
+  id="$(new_todo_uuid)"
+  id="${id#"${id%%[![:space:]]*}"}"
+  id="${id%"${id##*[![:space:]]}"}"
+  payload="$(api_call "lockIn/createTodo" "$(jq -nc --arg id "$id" --arg title "$title" '{id:$id, title:$title}')")"
+  printf '%s' "$payload" | unwrap_ok "$id"
+}
+
+cmd_lockin_todo_update() {
+  local id="${1:-}" completed="${2:-}"
+  id="${id#"${id%%[![:space:]]*}"}"
+  id="${id%"${id##*[![:space:]]}"}"
+  completed="${completed#"${completed%%[![:space:]]*}"}"
+  completed="${completed%"${completed##*[![:space:]]}"}"
+  if [[ -z "$id" ]]; then
+    fail "A todo id is required." "Pass the id as: lockin todo-update ID true|false"
+  fi
+  case "$completed" in
+    true|false) ;;
+    *)
+      fail "A completed flag is required." "Use true or false: lockin todo-update ID true|false"
+      ;;
+  esac
+  local payload
+  payload="$(api_call "lockIn/updateTodo" "$(jq -nc --arg id "$id" --arg completed "$completed" '{id:$id, completed: ($completed == "true")}')")"
+  printf '%s' "$payload" | unwrap_ok
+}
+
+cmd_lockin_todo_done() {
+  cmd_lockin_todo_update "${1:-}" "true"
+}
+
+cmd_lockin_todo_delete() {
+  local id="${1:-}"
+  id="${id#"${id%%[![:space:]]*}"}"
+  id="${id%"${id##*[![:space:]]}"}"
+  if [[ -z "$id" ]]; then
+    fail "A todo id is required." "Pass the id as: lockin todo-delete ID"
+  fi
+  local payload
+  payload="$(api_call "lockIn/deleteTodo" "$(jq -nc --arg id "$id" '{id:$id}')")"
+  printf '%s' "$payload" | unwrap_ok
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base-url)
@@ -384,6 +640,34 @@ case "$command" in
       mark-read) cmd_notifications_mark_read "${3:-}" ;;
       mark-all-read) cmd_notifications_mark_all_read ;;
       "") fail "Unknown command: notifications" ;;
+      *) fail "Unknown command: $2" ;;
+    esac
+    ;;
+  lockin)
+    case "${2:-}" in
+      state) cmd_lockin_state ;;
+      start)
+        shift 2
+        cmd_lockin_start "$@"
+        ;;
+      finish)
+        cmd_lockin_finish "${3:-}"
+        ;;
+      todos) cmd_lockin_todos ;;
+      todo-add)
+        shift 2
+        cmd_lockin_todo_add "$@"
+        ;;
+      todo-done)
+        cmd_lockin_todo_done "${3:-}"
+        ;;
+      todo-update)
+        cmd_lockin_todo_update "${3:-}" "${4:-}"
+        ;;
+      todo-delete)
+        cmd_lockin_todo_delete "${3:-}"
+        ;;
+      "") fail "Unknown command: lockin" ;;
       *) fail "Unknown command: $2" ;;
     esac
     ;;

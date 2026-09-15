@@ -1,0 +1,29 @@
+{
+  "participants": [
+    {
+      "id": "p-nested",
+      "title": "Nested Name Test",
+      "startedAt": "2026-09-15T02:51:02.216Z",
+      "expiresAt": "2026-09-15T03:51:02.216Z",
+      "user": {
+        "name": "Alex Tinkerer"
+      }
+    },
+    {
+      "id": "p-flat",
+      "title": "Flat Name Test",
+      "startedAt": "2026-09-15T02:51:02.216Z",
+      "expiresAt": "2026-09-15T03:51:02.216Z",
+      "displayName": "Blake Builder"
+    },
+    {
+      "title": "No Id Skip",
+      "startedAt": "2026-09-15T02:51:02.216Z",
+      "expiresAt": "2026-09-15T03:51:02.216Z",
+      "name": "Should Skip"
+    }
+  ],
+  "current": null,
+  "onboarded": true,
+  "serverNow": "2026-09-15T02:52:34.903Z"
+}

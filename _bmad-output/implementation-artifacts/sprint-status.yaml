@@ -84,9 +84,10 @@ development_status:
 
   # ============================================
   # Epic 5: LockIn
+  # Status: DONE (5.1–5.3 done)
   # ============================================
-  epic-5: backlog
-  5-1-lockin-state-room: backlog               # Story: 5.1 | BenjiID: bf92adeb-e8cc-4f4b-b529-7efd384109fa
-  5-2-lockin-start-finish-watchdog: backlog    # Story: 5.2 | BenjiID: c9e3452b-9f5d-4d07-8f3a-c61e4e802cca
-  5-3-lockin-todos: backlog                    # Story: 5.3 | BenjiID: d43c9625-bea9-4e70-9290-9e807a825cdf
+  epic-5: done
+  5-1-lockin-state-room: done                   # Story: 5.1 | BenjiID: bf92adeb-e8cc-4f4b-b529-7efd384109fa
+  5-2-lockin-start-finish-watchdog: done       # Story: 5.2 | BenjiID: c9e3452b-9f5d-4d07-8f3a-c61e4e802cca
+  5-3-lockin-todos: done                        # Story: 5.3 | BenjiID: d43c9625-bea9-4e70-9290-9e807a825cdf
   epic-5-retrospective: optional

@@ -7,5 +7,8 @@ root=$(cd "$(dirname -- "$0")" && pwd)
 "$root/unread.sh"
 "$root/list.sh"
 "$root/mark.sh"
+"$root/lockin-state.sh"
+"$root/lockin-session.sh"
+"$root/lockin-todos.sh"
 
-printf 'all tests passed: unread.sh list.sh mark.sh\n'
+printf 'all tests passed: unread.sh list.sh mark.sh lockin-state.sh lockin-session.sh lockin-todos.sh\n'

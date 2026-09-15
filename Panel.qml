@@ -41,24 +41,86 @@ Panel {
   property string feedStatusHint: ""
   property string notificationsErrorText: ""
   property string notificationsStatusHint: ""
+  property string lockinErrorText: ""
+  property string lockinStatusHint: ""
   property string latestId: ""
   property string seenId: ""
   property int unreadCount: 0
   property bool pendingUnread: false
   property string panelView: "feed"
   property var notifications: []
+  property var lockinCurrent: null
+  property var lockinParticipants: []
+  property string lockinServerNow: ""
+  property bool lockinOnboarded: false
+  property var lockinLastEnd: null
+  property int lockinSkewMs: 0
+  property int lockinFetchedAt: 0
+  property int lockinRemainingMs: 0
+  property string lockinTitleDraft: ""
+  property string lockinWatchdogSessionId: ""
+  property string lockinWatchdogRestartTitle: ""
+  property bool lockinWatchdogPending: false
+  property bool lockinWatchdogNotice: false
+  property var lockinTodos: []
+  property string lockinTodoDraft: ""
+  readonly property bool lockinLive: lockinCurrent !== null
+  readonly property bool lockinEarlyFinish: root.lockinLive
+    && root.lockinElapsedMs(root.lockinCurrent ? root.lockinCurrent.startedAt : "") < (30 * 60 * 1000)
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
-  readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running : feedProc.running
-  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running
+  readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running
+    : (root.panelView === "lockin"
+      ? (stateProc.running || startProc.running || finishProc.running || todosProc.running
+        || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
+      : feedProc.running)
+  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
 
   function syncViewMessages() {
     if (root.panelView === "notifications") {
       errorText = notificationsErrorText
       statusHint = notificationsStatusHint
+    } else if (root.panelView === "lockin") {
+      errorText = lockinErrorText
+      statusHint = lockinStatusHint
     } else {
       errorText = feedErrorText
       statusHint = feedStatusHint
     }
+  }
+
+  function formatDuration(ms) {
+    if (!isFinite(ms) || ms < 0) return "0:00"
+    var totalSec = Math.floor(ms / 1000)
+    var m = Math.floor(totalSec / 60)
+    var s = totalSec % 60
+    return m + ":" + (s < 10 ? "0" : "") + s
+  }
+
+  function lockinElapsedMs(startedAt) {
+    if (!lockinCurrent || !startedAt) return 0
+    var start = Date.parse(startedAt)
+    if (!isFinite(start)) return 0
+    return Math.max(0, Date.now() + lockinSkewMs - start)
+  }
+
+  function recomputeLockinRemainingMs() {
+    if (!lockinCurrent || !lockinCurrent.expiresAt || lockinServerNow === "") {
+      lockinRemainingMs = 0
+      return
+    }
+    var expires = Date.parse(lockinCurrent.expiresAt)
+    var server = Date.parse(lockinServerNow)
+    if (!isFinite(expires) || !isFinite(server)) {
+      lockinRemainingMs = 0
+      return
+    }
+    var remaining = (expires - server) - (Date.now() - lockinFetchedAt)
+    lockinRemainingMs = Math.max(0, remaining)
+  }
+
+  function lockinPageUrl() {
+    var base = String(root.baseUrl).replace(/\/$/, "")
+    return base + "/lock-in"
   }
 
   function cmd(args) {
@@ -110,10 +172,146 @@ Panel {
     }
   }
 
+  function refreshLockinState() {
+    if (!stateProc.running) {
+      stateProc.command = root.cmd(["lockin", "state"])
+      stateProc.running = true
+    }
+  }
+
+  function refreshLockinTodos() {
+    if (!todosProc.running) {
+      todosProc.command = root.cmd(["lockin", "todos"])
+      todosProc.running = true
+    }
+  }
+
+  function lockinTodoAddArgs(title) {
+    var trimmed = String(title === undefined || title === null ? "" : title).replace(/^\s+|\s+$/g, "")
+    if (trimmed === "")
+      return []
+    if (trimmed.length > 200)
+      trimmed = trimmed.slice(0, 200)
+    return ["lockin", "todo-add"].concat(trimmed.split(/\s+/))
+  }
+
+  function lockinTodoAdd(title) {
+    var args = root.lockinTodoAddArgs(title)
+    if (args.length === 0 || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
+      return
+    todoAddProc.command = root.cmd(args)
+    todoAddProc.running = true
+  }
+
+  function lockinTodoToggle(id, completed) {
+    var trimmed = String(id === undefined || id === null ? "" : id).replace(/^\s+|\s+$/g, "")
+    if (trimmed === "" || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
+      return
+    if (completed === true)
+      todoUpdateProc.command = root.cmd(["lockin", "todo-update", trimmed, "false"])
+    else
+      todoUpdateProc.command = root.cmd(["lockin", "todo-done", trimmed])
+    todoUpdateProc.running = true
+  }
+
+  function lockinTodoDelete(id) {
+    var trimmed = String(id === undefined || id === null ? "" : id).replace(/^\s+|\s+$/g, "")
+    if (trimmed === "" || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
+      return
+    todoDeleteProc.command = root.cmd(["lockin", "todo-delete", trimmed])
+    todoDeleteProc.running = true
+  }
+
+  function lockinStartArgs(title) {
+    var trimmed = String(title === undefined || title === null ? "" : title).replace(/^\s+|\s+$/g, "")
+    if (trimmed === "")
+      return ["lockin", "start"]
+    if (trimmed.length > 160)
+      trimmed = trimmed.slice(0, 160)
+    return ["lockin", "start"].concat(trimmed.split(/\s+/))
+  }
+
+  function lockinStart(title) {
+    if (root.lockinCurrent !== null || startProc.running || finishProc.running)
+      return
+    startProc.command = root.cmd(root.lockinStartArgs(title))
+    startProc.running = true
+  }
+
+  function lockinFinish() {
+    if (!root.lockinCurrent || !root.lockinCurrent.id || finishProc.running || startProc.running)
+      return
+    finishProc.command = root.cmd(["lockin", "finish", String(root.lockinCurrent.id)])
+    finishProc.running = true
+  }
+
+  function checkLockinWatchdog() {
+    if (!root.configured || !root.lockinCurrent || !root.lockinCurrent.id)
+      return
+    if (root.lockinWatchdogPending || finishProc.running || startProc.running)
+      return
+    if (root.lockinRemainingMs > 30000 || root.lockinRemainingMs <= 0)
+      return
+    if (root.lockinWatchdogSessionId === String(root.lockinCurrent.id))
+      return
+    root.lockinWatchdogSessionId = String(root.lockinCurrent.id)
+    root.lockinWatchdogRestartTitle = String(root.lockinCurrent.title || "")
+    root.lockinWatchdogPending = true
+    finishProc.command = root.cmd(["lockin", "finish", String(root.lockinCurrent.id)])
+    finishProc.running = true
+  }
+
+  function applyLockinFinish(data) {
+    if (data && data.ok === true) {
+      lockinErrorText = ""
+      if (root.lockinWatchdogPending) {
+        if (!startProc.running) {
+          startProc.command = root.cmd(root.lockinStartArgs(root.lockinWatchdogRestartTitle))
+          startProc.running = true
+        }
+      } else {
+        root.refreshLockinState()
+      }
+      return
+    }
+    root.lockinWatchdogPending = false
+    if (data && data.ok !== true && root.panelView === "lockin" && root.opened) {
+      lockinErrorText = data.error || "Could not finish LockIn."
+      lockinStatusHint = data.hint || ""
+      errorText = lockinErrorText
+      statusHint = lockinStatusHint
+    }
+  }
+
+  function applyLockinStart(data) {
+    if (data && data.ok === true) {
+      lockinErrorText = ""
+      if (root.lockinWatchdogPending) {
+        root.lockinWatchdogNotice = true
+        lockinStatusHint = "LockIn restarted automatically before the 60-minute cap."
+        root.lockinWatchdogPending = false
+        if (root.panelView === "lockin")
+          statusHint = lockinStatusHint
+      }
+      root.refreshLockinState()
+      return
+    }
+    root.lockinWatchdogPending = false
+    if (data && data.ok !== true && root.panelView === "lockin" && root.opened) {
+      lockinErrorText = data.error || "Could not start LockIn."
+      lockinStatusHint = data.hint || ""
+      errorText = lockinErrorText
+      statusHint = lockinStatusHint
+    }
+  }
+
   function refresh() {
     if (root.opened && root.panelView === "notifications")
       root.refreshNotifications()
-    else
+    else if (root.opened && root.panelView === "lockin") {
+      root.refreshLockinState()
+      root.refreshLockinTodos()
+    } else
       root.refreshFeed()
   }
 
@@ -256,11 +454,75 @@ Panel {
     }
   }
 
+  function applyLockinTodos(data) {
+    if (data && data.ok === true && Array.isArray(data.todos)) {
+      lockinTodos = data.todos.filter(function(item) {
+        return item && item.deleted !== true
+      })
+      if (root.panelView === "lockin") {
+        lockinErrorText = ""
+        if (lockinStatusHint === "")
+          statusHint = ""
+      }
+      return
+    }
+    if (data && data.ok !== true && root.panelView === "lockin" && root.opened) {
+      lockinErrorText = data.error || "Could not load LockIn checklist."
+      lockinStatusHint = data.hint || ""
+      errorText = lockinErrorText
+      statusHint = lockinStatusHint
+    }
+  }
+
+  function applyLockinTodoMutation(data) {
+    if (data && data.ok === true) {
+      lockinErrorText = ""
+      root.refreshLockinTodos()
+      return
+    }
+    if (data && data.ok !== true && root.panelView === "lockin" && root.opened) {
+      lockinErrorText = data.error || "Could not update LockIn checklist."
+      lockinStatusHint = data.hint || ""
+      errorText = lockinErrorText
+      statusHint = lockinStatusHint
+    }
+  }
+
+  function applyLockinState(data) {
+    if (data && data.ok === true) {
+      lockinCurrent = data.current || null
+      lockinParticipants = Array.isArray(data.participants) ? data.participants : []
+      lockinServerNow = String(data.serverNow || "")
+      lockinOnboarded = data.onboarded === true
+      lockinLastEnd = data.lastEnd || null
+      var serverStamp = Date.parse(lockinServerNow)
+      lockinSkewMs = isFinite(serverStamp) ? serverStamp - Date.now() : 0
+      lockinFetchedAt = Date.now()
+      recomputeLockinRemainingMs()
+      lockinErrorText = ""
+      var keepWatchdogHint = root.lockinWatchdogNotice
+      root.lockinWatchdogNotice = false
+      if (!keepWatchdogHint)
+        lockinStatusHint = ""
+      if (root.panelView === "lockin") {
+        errorText = ""
+        statusHint = lockinStatusHint
+      }
+      return
+    }
+    if (data && data.ok !== true && root.panelView === "lockin" && root.opened) {
+      lockinErrorText = data.error || "Could not load LockIn state."
+      lockinStatusHint = data.hint || ""
+      errorText = lockinErrorText
+      statusHint = lockinStatusHint
+    }
+  }
+
   onPanelViewChanged: root.syncViewMessages()
 
   onOpenedChanged: {
     if (opened) {
-      if (configured) refreshFeed()
+      if (configured) refresh()
       else checkStatus()
       markSeen()
     } else {
@@ -338,6 +600,95 @@ Panel {
     }
   }
 
+  Process {
+    id: stateProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLockinState(data)
+      }
+    }
+  }
+
+  Process {
+    id: startProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLockinStart(data)
+      }
+    }
+  }
+
+  Process {
+    id: finishProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLockinFinish(data)
+      }
+    }
+  }
+
+  Process {
+    id: todosProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLockinTodos(data)
+      }
+    }
+  }
+
+  Process {
+    id: todoAddProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        if (data && data.ok === true)
+          root.lockinTodoDraft = ""
+        root.applyLockinTodoMutation(data)
+      }
+    }
+  }
+
+  Process {
+    id: todoUpdateProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLockinTodoMutation(data)
+      }
+    }
+  }
+
+  Process {
+    id: todoDeleteProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLockinTodoMutation(data)
+      }
+    }
+  }
+
+  Timer {
+    interval: 1000
+    running: root.lockinCurrent !== null
+    repeat: true
+    onTriggered: {
+      root.recomputeLockinRemainingMs()
+      root.checkLockinWatchdog()
+    }
+  }
+
   Timer {
     interval: Math.max(1, root.refreshMinutes) * 60000
     running: true
@@ -352,6 +703,8 @@ Panel {
       }
       if (root.configured && !root.opened)
         root.refreshUnread()
+      if (root.configured && root.lockinCurrent !== null)
+        root.refreshLockinState()
     }
   }
 
@@ -427,6 +780,20 @@ Panel {
               if (buttonCode === Qt.LeftButton) {
                 root.panelView = "notifications"
                 root.refreshNotifications()
+              }
+            }
+          }
+
+          WidgetButton {
+            bar: root.bar
+            text: "LockIn"
+            active: root.panelView === "lockin"
+            activeColor: Color.accent
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton) {
+                root.panelView = "lockin"
+                root.refreshLockinState()
+                root.refreshLockinTodos()
               }
             }
           }
@@ -680,6 +1047,314 @@ Panel {
           color: root.mutedForeground
           font.family: root.contentFontFamily
           font.pixelSize: Style.font.body
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.panelView === "lockin"
+
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.lockinCurrent === null && root.configured
+
+            Text {
+              width: parent.width
+              text: "Session title (optional)"
+              color: root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            Rectangle {
+              width: parent.width
+              height: lockinTitleField.implicitHeight + Style.space(8)
+              radius: Style.space(4)
+              color: Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+              border.color: root.mutedForeground
+              border.width: 1
+
+              TextInput {
+                id: lockinTitleField
+                anchors.fill: parent
+                anchors.margins: Style.space(4)
+                text: root.lockinTitleDraft
+                onTextChanged: root.lockinTitleDraft = text
+                color: root.contentForeground
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.body
+                maximumLength: 160
+                selectByMouse: true
+                clip: true
+              }
+            }
+
+            WidgetButton {
+              width: parent.width
+              bar: root.bar
+              text: "Start"
+              enabled: !startProc.running && !finishProc.running
+              onPressed: function(buttonCode) {
+                if (buttonCode === Qt.LeftButton)
+                  root.lockinStart(root.lockinTitleDraft)
+              }
+            }
+          }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(4)
+            visible: root.lockinCurrent !== null
+
+            Text {
+              width: parent.width
+              text: root.plain(root.lockinCurrent ? root.lockinCurrent.title || "LockIn" : "")
+              color: root.contentForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.subtitle
+              font.bold: true
+              wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+              width: parent.width
+              spacing: Style.space(12)
+
+              Text {
+                text: "Elapsed " + root.formatDuration(root.lockinElapsedMs(root.lockinCurrent ? root.lockinCurrent.startedAt : ""))
+                color: root.contentForeground
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.body
+              }
+
+              Text {
+                text: root.formatDuration(root.lockinRemainingMs) + " left"
+                color: Color.accent
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
+            }
+
+            Text {
+              width: parent.width
+              text: "60 min cap"
+              color: root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              width: parent.width
+              visible: root.lockinEarlyFinish
+              text: "Finishing before 30 minutes does not earn Sparkles. The reward window is 30\u201360 minutes."
+              color: root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+
+            WidgetButton {
+              width: parent.width
+              bar: root.bar
+              text: "Finish"
+              enabled: !startProc.running && !finishProc.running
+              onPressed: function(buttonCode) {
+                if (buttonCode === Qt.LeftButton)
+                  root.lockinFinish()
+              }
+            }
+          }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.lockinCurrent !== null
+
+            Text {
+              width: parent.width
+              text: "Locked in now \u00b7 " + root.lockinParticipants.length
+              color: root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Repeater {
+              model: root.lockinParticipants
+
+              delegate: Column {
+                required property var modelData
+                width: parent.width
+                spacing: Style.space(2)
+
+                Text {
+                  width: parent.width
+                  text: root.plain(modelData.name || "Tinkerer")
+                  color: root.contentForeground
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.body
+                  elide: Text.ElideRight
+                }
+
+                Text {
+                  width: parent.width
+                  text: root.plain(root.snippet(modelData.title || "", 60))
+                  color: root.mutedForeground
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  elide: Text.ElideRight
+                }
+
+                Text {
+                  width: parent.width
+                  text: root.formatDuration(root.lockinElapsedMs(modelData.startedAt)) + " elapsed"
+                  color: root.mutedForeground
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+            }
+          }
+
+          Text {
+            width: parent.width
+            visible: root.lockinCurrent === null && root.configured && !root.viewBusy && root.errorText === ""
+            text: "No LockIn session running."
+            color: root.mutedForeground
+            font.family: root.contentFontFamily
+            font.pixelSize: Style.font.body
+          }
+
+          Text {
+            width: parent.width
+            visible: root.lockinCurrent === null && root.lockinLastEnd && root.lockinLastEnd.automaticallyEnded === true && root.errorText === ""
+            text: "Your last session ended at the 60-minute cap."
+            color: root.mutedForeground
+            font.family: root.contentFontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+          }
+
+          Text {
+            width: parent.width
+            visible: !root.lockinOnboarded && root.errorText === ""
+            text: "Set up LockIn on the web to join co-working sessions."
+            color: root.mutedForeground
+            font.family: root.contentFontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+          }
+
+          WidgetButton {
+            width: parent.width
+            visible: !root.lockinOnboarded
+            bar: root.bar
+            text: "Open LockIn on web"
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton)
+                root.openUrl(root.lockinPageUrl())
+            }
+          }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.configured
+
+            Text {
+              width: parent.width
+              text: "Checklist"
+              color: root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Rectangle {
+              width: parent.width
+              height: lockinTodoField.implicitHeight + Style.space(8)
+              radius: Style.space(4)
+              color: Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+              border.color: root.mutedForeground
+              border.width: 1
+
+              TextInput {
+                id: lockinTodoField
+                anchors.fill: parent
+                anchors.margins: Style.space(4)
+                text: root.lockinTodoDraft
+                onTextChanged: root.lockinTodoDraft = text
+                color: root.contentForeground
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.body
+                maximumLength: 200
+                selectByMouse: true
+                clip: true
+              }
+            }
+
+            WidgetButton {
+              width: parent.width
+              bar: root.bar
+              text: "Add todo"
+              enabled: !todoAddProc.running && !todoUpdateProc.running && !todoDeleteProc.running
+              onPressed: function(buttonCode) {
+                if (buttonCode === Qt.LeftButton)
+                  root.lockinTodoAdd(root.lockinTodoDraft)
+              }
+            }
+
+            Repeater {
+              model: root.lockinTodos
+
+              delegate: RowLayout {
+                required property var modelData
+                width: parent.width
+                spacing: Style.space(6)
+
+                WidgetButton {
+                  bar: root.bar
+                  text: modelData.completed === true ? "\u2611" : "\u2610"
+                  enabled: !todoAddProc.running && !todoUpdateProc.running && !todoDeleteProc.running
+                  onPressed: function(buttonCode) {
+                    if (buttonCode === Qt.LeftButton)
+                      root.lockinTodoToggle(modelData.id, modelData.completed === true)
+                  }
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  text: root.plain(modelData.title || "")
+                  color: modelData.completed === true ? root.mutedForeground : root.contentForeground
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.body
+                  font.strikeout: modelData.completed === true
+                  wrapMode: Text.WordWrap
+                }
+
+                WidgetButton {
+                  bar: root.bar
+                  text: "Delete"
+                  enabled: !todoAddProc.running && !todoUpdateProc.running && !todoDeleteProc.running
+                  onPressed: function(buttonCode) {
+                    if (buttonCode === Qt.LeftButton)
+                      root.lockinTodoDelete(modelData.id)
+                  }
+                }
+              }
+            }
+
+            Text {
+              width: parent.width
+              visible: root.lockinTodos.length === 0 && !todosProc.running && root.errorText === ""
+              text: "No checklist items yet."
+              color: root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+          }
         }
 
         WidgetButton {

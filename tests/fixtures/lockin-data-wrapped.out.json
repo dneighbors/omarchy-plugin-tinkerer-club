@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "current": {
+    "id": "sess-wrap",
+    "title": "Wrapped Session",
+    "startedAt": "2026-09-15T02:51:02.216Z",
+    "expiresAt": "2026-09-15T03:51:02.216Z",
+    "automaticallyEnded": false
+  },
+  "participants": [],
+  "serverNow": "2026-09-15T02:52:34.903Z",
+  "onboarded": false
+}
