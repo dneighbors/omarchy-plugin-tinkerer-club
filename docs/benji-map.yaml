@@ -19,6 +19,9 @@ epics:
   "4":
     id: 3ee89ffa-e7a8-4847-9f55-11adfd909798
     name: "Tinkerer Club Epic 4: Ops Hygiene"
+  "5":
+    id: cb2736e0-ca86-4041-9c3d-fa22315119ab
+    name: "Tinkerer Club Epic 5: LockIn"
 stories:
   "0.1":
     id: 57e4fbb2-3977-414f-9c45-35a373330bff
@@ -76,3 +79,23 @@ stories:
     id: 52c1c6f9-e879-4939-9233-33f9fa3c6c23
     title: 4.1 Standing chores container
     epic: 4
+  "4.2":
+    id: 4a261c53-ffac-43dc-aec4-78f57d202516
+    title: 4.2 Publish to Omarchy marketplace
+    epic: 4
+  "4.3":
+    id: 625248d6-05f9-45dc-b7ef-511679aac628
+    title: 4.3 Marketplace listing live
+    epic: 4
+  "5.1":
+    id: bf92adeb-e8cc-4f4b-b529-7efd384109fa
+    title: 5.1 LockIn state and room
+    epic: 5
+  "5.2":
+    id: c9e3452b-9f5d-4d07-8f3a-c61e4e802cca
+    title: 5.2 Start, finish, and 59:30 watchdog
+    epic: 5
+  "5.3":
+    id: d43c9625-bea9-4e70-9290-9e807a825cdf
+    title: 5.3 LockIn checklist todos
+    epic: 5

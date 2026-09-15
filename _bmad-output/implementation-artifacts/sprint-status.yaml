@@ -74,7 +74,19 @@ development_status:
 
   # ============================================
   # Epic 4: Ops Hygiene
+  # Status: IN PROGRESS (4.1 done; publish stories tracked)
   # ============================================
-  epic-4: backlog
-  4-1-standing-chores: backlog                # Story: 4.1 | BenjiID: 52c1c6f9-e879-4939-9233-33f9fa3c6c23
+  epic-4: in-progress
+  4-1-standing-chores: done                    # Story: 4.1 | BenjiID: 52c1c6f9-e879-4939-9233-33f9fa3c6c23
+  4-2-publish-marketplace: backlog             # Story: 4.2 | BenjiID: 4a261c53-ffac-43dc-aec4-78f57d202516
+  4-3-marketplace-listing-live: backlog        # Story: 4.3 | BenjiID: 625248d6-05f9-45dc-b7ef-511679aac628
   epic-4-retrospective: optional
+
+  # ============================================
+  # Epic 5: LockIn
+  # ============================================
+  epic-5: backlog
+  5-1-lockin-state-room: backlog               # Story: 5.1 | BenjiID: bf92adeb-e8cc-4f4b-b529-7efd384109fa
+  5-2-lockin-start-finish-watchdog: backlog    # Story: 5.2 | BenjiID: c9e3452b-9f5d-4d07-8f3a-c61e4e802cca
+  5-3-lockin-todos: backlog                    # Story: 5.3 | BenjiID: d43c9625-bea9-4e70-9290-9e807a825cdf
+  epic-5-retrospective: optional

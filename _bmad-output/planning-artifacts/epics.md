@@ -10,7 +10,7 @@ inputDocuments:
 
 ## Overview
 
-Living epic file. Write new stories here, then add the same story to `epics.source.yaml` and run `benji_sync.mjs` so a Benji todo lands on Products -> Omarchy Plugins -> Tinkerer Club. Paste the new Benji id back onto the story. Status lives in `sprint-status.yaml`. MVP is Epics 0, 1. 5 epics, 14 stories.
+Living epic file. Write new stories here, then add the same story to `epics.source.yaml` and run `benji_sync.mjs` so a Benji todo lands on Products -> Omarchy Plugins -> Tinkerer Club. Paste the new Benji id back onto the story. Status lives in `sprint-status.yaml`. MVP is Epics 0, 1. 6 epics, 19 stories.
 
 | Epic | Title | Stories | Source | MVP |
 |---|---|---|---|---|
@@ -18,7 +18,8 @@ Living epic file. Write new stories here, then add the same story to `epics.sour
 | 1 | Club Feed | 4 | OpenAPI post.timeline; Raycast extension contract | yes |
 | 2 | Notifications | 3 | OpenAPI notification.* |  |
 | 3 | Events | 2 | OpenAPI event.calendar, event.liveBanner |  |
-| 4 | Ops Hygiene | 1 | portfolio convention (RevivaGo Epic 58) |  |
+| 4 | Ops Hygiene | 3 | portfolio convention (RevivaGo Epic 58); plugins.omarchy.org/publish |  |
+| 5 | LockIn | 3 | OpenAPI lockIn.* |  |
 
 
 ## Epic 0: Plugin Foundation
@@ -328,3 +329,116 @@ So that **chores have a Benji project without a new epic each time**.
 **Then** it gets a story in this YAML and a Benji todo after sync
 
 Benji todo: `52c1c6f9-e879-4939-9233-33f9fa3c6c23`
+
+### Story 4.2: Publish to Omarchy marketplace
+
+As a **developer**,
+I want **dneighbors.tinkerer-club listed on plugins.omarchy.org**,
+So that **members can install from the catalog**.
+
+**Acceptance Criteria:**
+
+**Given** a public repo and valid manifest.json
+**When** the publish issue form is submitted
+**Then** automated validation passes on current main
+
+Benji todo: `4a261c53-ffac-43dc-aec4-78f57d202516`
+
+### Story 4.3: Marketplace listing live
+
+As a **developer**,
+I want **the README to document catalog install after maintainer approval**,
+So that **new users find the official install path**.
+
+**Acceptance Criteria:**
+
+**Given** maintainer approval
+**When** the listing is live
+**Then** README documents the plugins.omarchy.org install path
+
+Benji todo: `625248d6-05f9-45dc-b7ef-511679aac628`
+
+
+## Epic 5: LockIn
+
+**Goal:** Timed co-working sessions from the bar with participant rail, checklist, and a 59:30 auto-finish watchdog so members do not lose Sparkles past 60 minutes.
+
+**Why:** LockIn is the other focus surface after notifications. The web UI is a reverse pomodoro with a hard 60-minute cap.
+
+**Dependencies:** Epic 0
+
+**Source:** OpenAPI lockIn.*; https://app.tinkerer.club/api/docs#/lockIn
+
+**Notes:** `lockIn/state` returns `current`, `participants`, `serverNow`, `onboarded`. `expiresAt` is `startedAt + 60m`. Finish before `expiresAt` or `automaticallyEnded` loses the reward. Sparkles are server-side only.
+
+**Benji project:** `cb2736e0-ca86-4041-9c3d-fa22315119ab` (Tinkerer Club Epic 5: LockIn)
+
+### Story 5.1: LockIn state and room
+
+As a **member**,
+I want **lockIn/state in the helper and a LockIn panel view**,
+So that **I see my session, countdown, and who else is locked in**.
+
+**Acceptance Criteria:**
+
+**Given** a valid key
+**When** `bin/tinkerer lockin state` runs
+**Then** it returns `current`, `participants`, and `serverNow`
+
+**Given** a live session
+**When** the panel LockIn view is open
+**Then** title, elapsed, remaining, 60-minute cap, and participant rail render
+
+**Given** a live session and the panel is closed
+**When** the bar is idle
+**Then** a session cue shows remaining time and the unread pill still wins if both are true
+
+Benji todo: `bf92adeb-e8cc-4f4b-b529-7efd384109fa`
+
+### Story 5.2: Start, finish, and 59:30 watchdog
+
+As a **member**,
+I want **to start and finish sessions from the panel with auto-submit before the 60-minute cap**,
+So that **I do not lose Sparkles because I forgot to stop**.
+
+**Acceptance Criteria:**
+
+**Given** no live session
+**When** I start with an optional title
+**Then** `lockIn/start` runs and state shows a new current session
+
+**Given** a live session
+**When** I finish
+**Then** `lockIn/finish` runs with `current.id` and state clears or updates
+
+**Given** a live session at T-30s before `expiresAt`
+**When** the watchdog fires
+**Then** it auto-finishes and auto-starts a new session with the same title
+
+**Given** Finish is clicked
+**When** elapsed is under 30 minutes
+**Then** Finish still runs and reward copy explains the 30-60 minute window
+
+Benji todo: `c9e3452b-9f5d-4d07-8f3a-c61e4e802cca`
+
+### Story 5.3: LockIn checklist todos
+
+As a **member**,
+I want **my private LockIn checklist in the panel**,
+So that **I can track focus tasks across sessions**.
+
+**Acceptance Criteria:**
+
+**Given** a valid key
+**When** `bin/tinkerer lockin todos` runs
+**Then** it returns the checklist array
+
+**Given** the LockIn view
+**When** I add, complete, or delete a todo
+**Then** createTodo, updateTodo, or deleteTodo runs with a client-generated UUID
+
+**Given** todos exist
+**When** no session is running
+**Then** the checklist still lists items the same as on the web
+
+Benji todo: `d43c9625-bea9-4e70-9290-9e807a825cdf`

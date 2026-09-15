@@ -1,8 +1,9 @@
 # Source of truth for epics.md, sprint-status.yaml, and Benji sync.
-# Render with: python3 ~/Public/domain-buildplans/scripts/epics_render.py <this file>
-# Sync with:   node ~/Public/domain-buildplans/scripts/benji/benji_sync.mjs <this file>
+# Sync with: node ~/Public/domain-buildplans/scripts/benji/benji_sync.mjs <this file>
 #
-# Add a story here, then render + sync. Benji list is Products -> Omarchy Plugins -> Tinkerer Club.
+# Add a story here, append epics.md + sprint-status.yaml by hand, then sync.
+# Do NOT run epics_render.py — it resets every story in sprint-status to backlog.
+# Benji list is Products -> Omarchy Plugins -> Tinkerer Club.
 project: omarchy-plugin-tinkerer-club
 project_name: Tinkerer Club Omarchy Plugin
 benji:
@@ -43,11 +44,11 @@ epics:
         slug: bmad-benji-tracking
         title: Epics, sprint status, and Benji list
         as: developer
-        want: epics.source.yaml rendered to epics.md and sprint-status.yaml, synced to Benji
+        want: epics.source.yaml synced to Benji with hand-maintained epics.md and sprint-status.yaml
         so: new stories can be written and linked to tasks under Products -> Omarchy Plugins -> Tinkerer Club
         ac:
           - "Given Products, When Omarchy Plugins and Tinkerer Club lists exist, Then Tinkerer Club is nested under Omarchy Plugins"
-          - "Given epics.source.yaml, When epics_render.py and benji_sync.mjs run, Then epics.md, sprint-status.yaml, and docs/benji-map.yaml contain Benji project and todo ids"
+          - "Given epics.source.yaml, When benji_sync.mjs runs, Then docs/benji-map.yaml contains Benji project and todo ids"
       - id: "0.4"
         slug: member-api-key-file
         title: Member API key file and helper status
@@ -181,3 +182,60 @@ epics:
         so: chores have a Benji project without a new epic each time
         ac:
           - "Given a plugin bug or marketplace task, When it is added here, Then it gets a story in this YAML and a Benji todo after sync"
+      - id: "4.2"
+        slug: publish-marketplace
+        title: Publish to Omarchy marketplace
+        as: developer
+        want: dneighbors.tinkerer-club listed on plugins.omarchy.org
+        so: members can install from the catalog
+        ac:
+          - "Given a public repo and valid manifest.json, When the publish issue form is submitted, Then automated validation passes on current main"
+      - id: "4.3"
+        slug: marketplace-listing-live
+        title: Marketplace listing live
+        as: developer
+        want: the README to document catalog install after maintainer approval
+        so: new users find the official install path
+        ac:
+          - "Given maintainer approval, When the listing is live, Then README documents the plugins.omarchy.org install path"
+
+  - num: 5
+    title: LockIn
+    emoji: "🔒"
+    source: OpenAPI lockIn.*; https://app.tinkerer.club/api/docs#/lockIn
+    goal: Timed co-working sessions from the bar with participant rail, checklist, and a 59:30 auto-finish watchdog so members do not lose Sparkles past 60 minutes.
+    why: LockIn is the other focus surface after notifications. The web UI is a reverse pomodoro with a hard 60-minute cap.
+    dependencies: "0"
+    notes: lockIn/state returns current, participants, serverNow, onboarded. expiresAt is startedAt plus 60m. Finish before expiresAt or automaticallyEnded loses the reward. Sparkles are server-side only.
+    stories:
+      - id: "5.1"
+        slug: lockin-state-room
+        title: LockIn state and room
+        as: member
+        want: lockIn/state in the helper and a LockIn panel view
+        so: I see my session, countdown, and who else is locked in
+        ac:
+          - "Given a valid key, When bin/tinkerer lockin state runs, Then it returns current, participants, and serverNow"
+          - "Given a live session, When the panel LockIn view is open, Then title, elapsed, remaining, 60-minute cap, and participant rail render"
+          - "Given a live session and the panel is closed, When the bar is idle, Then a session cue shows remaining time and the unread pill still wins if both are true"
+      - id: "5.2"
+        slug: lockin-start-finish-watchdog
+        title: Start, finish, and 59:30 watchdog
+        as: member
+        want: to start and finish sessions from the panel with auto-submit before the 60-minute cap
+        so: I do not lose Sparkles because I forgot to stop
+        ac:
+          - "Given no live session, When I start with an optional title, Then lockIn/start runs and state shows a new current session"
+          - "Given a live session, When I finish, Then lockIn/finish runs with current.id and state clears or updates"
+          - "Given a live session at T-30s before expiresAt, When the watchdog fires, Then it auto-finishes and auto-starts a new session with the same title"
+          - "Given Finish is clicked, When elapsed is under 30 minutes, Then Finish still runs and reward copy explains the 30-60 minute window"
+      - id: "5.3"
+        slug: lockin-todos
+        title: LockIn checklist todos
+        as: member
+        want: my private LockIn checklist in the panel
+        so: I can track focus tasks across sessions
+        ac:
+          - "Given a valid key, When bin/tinkerer lockin todos runs, Then it returns the checklist array"
+          - "Given the LockIn view, When I add, complete, or delete a todo, Then createTodo, updateTodo, or deleteTodo runs with a client-generated UUID"
+          - "Given todos exist, When no session is running, Then the checklist still lists items the same as on the web"
