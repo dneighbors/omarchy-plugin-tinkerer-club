@@ -11,6 +11,8 @@ bad()  { printf 'not ok  %s\n' "$1"; fail=1; }
 
 [ -x "$tinkerer" ] || { echo "missing $tinkerer"; exit 1; }
 
+unset TINKERER_API_KEY TINKERER_KEY TINKERER_APIKEY 2>/dev/null || true
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/bin"
