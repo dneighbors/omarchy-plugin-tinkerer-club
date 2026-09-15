@@ -57,6 +57,7 @@ Panel {
   property int lockinSkewMs: 0
   property int lockinFetchedAt: 0
   property int lockinRemainingMs: 0
+  property int lockinClockTick: 0
   property string lockinTitleDraft: ""
   property string lockinWatchdogSessionId: ""
   property string lockinWatchdogRestartTitle: ""
@@ -65,8 +66,15 @@ Panel {
   property var lockinTodos: []
   property string lockinTodoDraft: ""
   readonly property bool lockinLive: lockinCurrent !== null
-  readonly property bool lockinEarlyFinish: root.lockinLive
-    && root.lockinElapsedMs(root.lockinCurrent ? root.lockinCurrent.startedAt : "") < (30 * 60 * 1000)
+  readonly property bool lockinEarlyFinish: {
+    var tick = root.lockinClockTick
+    return root.lockinLive
+      && root.lockinElapsedMs(root.lockinCurrent ? root.lockinCurrent.startedAt : "") < (30 * 60 * 1000)
+  }
+  readonly property int lockinSessionElapsedMs: {
+    var tick = root.lockinClockTick
+    return root.lockinElapsedMs(root.lockinCurrent ? root.lockinCurrent.startedAt : "")
+  }
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
   readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running
     : (root.panelView === "lockin"
@@ -104,18 +112,16 @@ Panel {
   }
 
   function recomputeLockinRemainingMs() {
-    if (!lockinCurrent || !lockinCurrent.expiresAt || lockinServerNow === "") {
+    if (!lockinCurrent) {
       lockinRemainingMs = 0
       return
     }
-    var expires = Date.parse(lockinCurrent.expiresAt)
-    var server = Date.parse(lockinServerNow)
-    if (!isFinite(expires) || !isFinite(server)) {
+    var expires = Date.parse(String(lockinCurrent.expiresAt || ""))
+    if (!isFinite(expires)) {
       lockinRemainingMs = 0
       return
     }
-    var remaining = (expires - server) - (Date.now() - lockinFetchedAt)
-    lockinRemainingMs = Math.max(0, remaining)
+    lockinRemainingMs = Math.max(0, expires - (Date.now() + lockinSkewMs))
   }
 
   function lockinPageUrl() {
@@ -684,6 +690,7 @@ Panel {
     running: root.lockinCurrent !== null
     repeat: true
     onTriggered: {
+      root.lockinClockTick = (root.lockinClockTick + 1) % 1000000
       root.recomputeLockinRemainingMs()
       root.checkLockinWatchdog()
     }
@@ -1122,7 +1129,7 @@ Panel {
               spacing: Style.space(12)
 
               Text {
-                text: "Elapsed " + root.formatDuration(root.lockinElapsedMs(root.lockinCurrent ? root.lockinCurrent.startedAt : ""))
+                text: "Elapsed " + root.formatDuration(root.lockinSessionElapsedMs)
                 color: root.contentForeground
                 font.family: root.contentFontFamily
                 font.pixelSize: Style.font.body
@@ -1209,6 +1216,7 @@ Panel {
 
                 Text {
                   width: parent.width
+                  readonly property int tick: root.lockinClockTick
                   text: root.formatDuration(root.lockinElapsedMs(modelData.startedAt)) + " elapsed"
                   color: root.mutedForeground
                   font.family: root.contentFontFamily

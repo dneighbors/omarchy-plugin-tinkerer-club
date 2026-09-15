@@ -317,7 +317,7 @@ unwrap_lockin_state() {
          else "" end) as $nested
         | if $nested != "" then $nested
           else text($p; ["name","displayName","username"]) // "Tinkerer" end;
-      def normalize_current($c):
+      def normalize_session($c):
         if ($c | type) != "object" then null
         else (text($c; ["id"])) as $id
         | if $id == "" then null
@@ -330,11 +330,16 @@ unwrap_lockin_state() {
           }
           end
         end;
-      def normalize_last($c):
-        normalize_current($c) as $base
+      def normalize_current($c):
+        normalize_session($c) as $base
         | if $base == null then null
-          else
-            $base + (if text($c; ["endedAt"]) != "" then {endedAt: text($c; ["endedAt"])} else {} end)
+          elif (text($c; ["endedAt"]) != "") then null
+          else $base end;
+      def normalize_last($c):
+        normalize_session($c) as $base
+        | if $base == null then null
+        else
+          $base + (if text($c; ["endedAt"]) != "" then {endedAt: text($c; ["endedAt"])} else {} end)
           end;
       def participants_list($p):
         if ($p | type) == "array" then $p
@@ -375,7 +380,13 @@ unwrap_lockin_state() {
           if $current == null then
             (
               if ($p | type) == "object" then
-                ($p.lastEnd // $p.lastSession // $p.endedSession // null)
+                (
+                  if ($p.current | type) == "object" and (text($p.current; ["endedAt"]) != "") then
+                    $p.current
+                  else
+                    ($p.lastEnd // $p.lastSession // $p.endedSession // null)
+                  end
+                )
               else null end
             ) as $le
             | if $le != null then
