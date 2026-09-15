@@ -37,10 +37,29 @@ Panel {
   property bool configured: false
   property string statusHint: ""
   property string errorText: ""
+  property string feedErrorText: ""
+  property string feedStatusHint: ""
+  property string notificationsErrorText: ""
+  property string notificationsStatusHint: ""
   property string latestId: ""
   property string seenId: ""
+  property int unreadCount: 0
+  property bool pendingUnread: false
+  property string panelView: "feed"
+  property var notifications: []
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
-  readonly property bool busy: statusProc.running || feedProc.running
+  readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running : feedProc.running
+  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running
+
+  function syncViewMessages() {
+    if (root.panelView === "notifications") {
+      errorText = notificationsErrorText
+      statusHint = notificationsStatusHint
+    } else {
+      errorText = feedErrorText
+      statusHint = feedStatusHint
+    }
+  }
 
   function cmd(args) {
     var base = [root.script, "--base-url", String(root.baseUrl), "--limit", String(root.feedLimit)]
@@ -75,11 +94,36 @@ Panel {
     if (latestId !== "") seenId = latestId
   }
 
-  function refresh() {
+  function refreshFeed() {
     if (!feedProc.running) {
       feedProc.command = root.cmd(["feed"])
       feedProc.running = true
     }
+  }
+
+  function refreshNotifications() {
+    if (!root.opened)
+      return
+    if (!listProc.running) {
+      listProc.command = root.cmd(["notifications", "list"])
+      listProc.running = true
+    }
+  }
+
+  function refresh() {
+    if (root.opened && root.panelView === "notifications")
+      root.refreshNotifications()
+    else
+      root.refreshFeed()
+  }
+
+  function refreshUnread() {
+    if (unreadProc.running) {
+      pendingUnread = true
+      return
+    }
+    unreadProc.command = root.cmd(["notifications", "unread"])
+    unreadProc.running = true
   }
 
   function checkStatus() {
@@ -95,37 +139,132 @@ Panel {
     browserProc.running = true
   }
 
+  function markRead(id) {
+    var trimmed = String(id === undefined || id === null ? "" : id).replace(/^\s+|\s+$/g, "")
+    if (trimmed === "")
+      return
+    if (!root.opened || root.panelView !== "notifications")
+      return
+    if (markReadProc.running)
+      return
+    markReadProc.command = root.cmd(["notifications", "mark-read", trimmed])
+    markReadProc.running = true
+  }
+
+  function markAllRead() {
+    if (!root.opened || root.panelView !== "notifications")
+      return
+    if (markAllReadProc.running)
+      return
+    markAllReadProc.command = root.cmd(["notifications", "mark-all-read"])
+    markAllReadProc.running = true
+  }
+
+  function applyMark(data) {
+    if (data && data.ok === true) {
+      if (root.panelView === "notifications") {
+        notificationsErrorText = ""
+        notificationsStatusHint = ""
+        errorText = ""
+        statusHint = ""
+      }
+      root.refreshUnread()
+      return
+    }
+    if (data && data.ok !== true && root.panelView === "notifications" && root.opened) {
+      notificationsErrorText = data.error || "Could not mark notifications read."
+      notificationsStatusHint = data.hint || ""
+      errorText = notificationsErrorText
+      statusHint = notificationsStatusHint
+    }
+  }
+
   function applyStatus(data) {
     configured = data.configured === true
     statusHint = data.hint || ""
-    if (data.configured !== true)
+    feedStatusHint = statusHint
+    notificationsStatusHint = statusHint
+    if (data.configured !== true) {
       errorText = data.error || "Add your Tinkerer Club API key."
-    else if (errorText === "Add your Tinkerer Club API key.")
+      feedErrorText = errorText
+      notificationsErrorText = errorText
+    } else if (errorText === "Add your Tinkerer Club API key.") {
       errorText = ""
+      if (feedErrorText === "Add your Tinkerer Club API key.")
+        feedErrorText = ""
+      if (notificationsErrorText === "Add your Tinkerer Club API key.")
+        notificationsErrorText = ""
+    }
+    if (root.configured && !root.opened)
+      root.refreshUnread()
   }
 
   function applyFeed(data) {
     if (data.ok !== true) {
-      errorText = data.error || "Could not load the feed."
-      statusHint = data.hint || ""
+      feedErrorText = data.error || "Could not load the feed."
+      feedStatusHint = data.hint || ""
+      if (root.panelView === "feed") {
+        errorText = feedErrorText
+        statusHint = feedStatusHint
+      }
       configured = data.error !== "Add your Tinkerer Club API key." ? configured : false
       return
     }
     configured = true
-    errorText = ""
-    statusHint = ""
+    feedErrorText = ""
+    feedStatusHint = ""
+    if (root.panelView === "feed") {
+      errorText = ""
+      statusHint = ""
+    }
     posts = data.posts || []
     if (posts.length)
       latestId = String(posts[0].id || "")
     if (root.opened)
       markSeen()
+    if (root.configured && root.opened)
+      root.refreshUnread()
   }
+
+  function applyUnread(data) {
+    if (data && data.ok === true && typeof data.count === "number" && isFinite(data.count) && data.count >= 0)
+      unreadCount = Math.floor(data.count)
+    if (pendingUnread) {
+      pendingUnread = false
+      root.refreshUnread()
+    }
+  }
+
+  function applyNotifications(data) {
+    if (data && data.ok === true && Array.isArray(data.notifications)) {
+      root.notifications = data.notifications
+      notificationsErrorText = ""
+      notificationsStatusHint = ""
+      if (root.panelView === "notifications") {
+        errorText = ""
+        statusHint = ""
+      }
+      return
+    }
+    if (data && data.ok !== true && root.opened) {
+      notificationsErrorText = data.error || "Could not load notifications."
+      notificationsStatusHint = data.hint || ""
+      if (root.panelView === "notifications") {
+        errorText = notificationsErrorText
+        statusHint = notificationsStatusHint
+      }
+    }
+  }
+
+  onPanelViewChanged: root.syncViewMessages()
 
   onOpenedChanged: {
     if (opened) {
-      if (configured) refresh()
+      if (configured) refreshFeed()
       else checkStatus()
       markSeen()
+    } else {
+      panelView = "feed"
     }
   }
 
@@ -137,7 +276,7 @@ Panel {
         var data
         try { data = JSON.parse(text) } catch (e) { return }
         root.applyStatus(data)
-        if (root.configured && root.opened) root.refresh()
+        if (root.configured && root.opened) root.refreshFeed()
       }
     }
   }
@@ -155,18 +294,64 @@ Panel {
 
   Process { id: browserProc }
 
+  Process {
+    id: unreadProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyUnread(data)
+      }
+    }
+  }
+
+  Process {
+    id: listProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyNotifications(data)
+      }
+    }
+  }
+
+  Process {
+    id: markReadProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyMark(data)
+      }
+    }
+  }
+
+  Process {
+    id: markAllReadProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyMark(data)
+      }
+    }
+  }
+
   Timer {
     interval: Math.max(1, root.refreshMinutes) * 60000
     running: true
     repeat: true
     triggeredOnStart: true
     onTriggered: {
-      if (root.opened) root.refresh()
+      if (root.opened) root.refreshFeed()
       else root.checkStatus()
       if (root.configured && !root.opened && !feedProc.running) {
         feedProc.command = root.cmd(["feed"])
         feedProc.running = true
       }
+      if (root.configured && !root.opened)
+        root.refreshUnread()
     }
   }
 
@@ -210,12 +395,61 @@ Panel {
 
           WidgetButton {
             bar: root.bar
-            text: root.busy ? "\u2026" : "Refresh"
-            enabled: !root.busy
+            text: root.viewBusy ? "\u2026" : "Refresh"
+            enabled: !root.viewBusy
             onPressed: function(buttonCode) {
               if (buttonCode === Qt.LeftButton) root.refresh()
             }
           }
+        }
+
+        RowLayout {
+          width: parent.width
+          spacing: Style.space(8)
+
+          WidgetButton {
+            bar: root.bar
+            text: "Feed"
+            active: root.panelView === "feed"
+            activeColor: Color.accent
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton)
+                root.panelView = "feed"
+            }
+          }
+
+          WidgetButton {
+            bar: root.bar
+            text: "Notifications"
+            active: root.panelView === "notifications"
+            activeColor: Color.accent
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton) {
+                root.panelView = "notifications"
+                root.refreshNotifications()
+              }
+            }
+          }
+
+          Item { Layout.fillWidth: true }
+        }
+
+        RowLayout {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.panelView === "notifications" && root.unreadCount > 0
+
+          WidgetButton {
+            bar: root.bar
+            text: "Mark all read"
+            enabled: !markAllReadProc.running
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton)
+                root.markAllRead()
+            }
+          }
+
+          Item { Layout.fillWidth: true }
         }
 
         Text {
@@ -247,7 +481,7 @@ Panel {
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           flickableDirection: Flickable.VerticalFlick
-          visible: root.posts.length > 0
+          visible: root.panelView === "feed" && root.posts.length > 0
 
           Column {
             id: feedColumn
@@ -324,10 +558,125 @@ Panel {
           }
         }
 
+        Flickable {
+          id: notificationsFlick
+          width: parent.width
+          height: Math.min(notificationsColumn.implicitHeight, root.listMaxHeight)
+          contentWidth: width
+          contentHeight: notificationsColumn.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          flickableDirection: Flickable.VerticalFlick
+          visible: root.panelView === "notifications" && root.notifications.length > 0
+
+          Column {
+            id: notificationsColumn
+            width: notificationsFlick.width
+            spacing: Style.space(6)
+
+            Repeater {
+              model: root.notifications
+
+              delegate: Item {
+                required property var modelData
+                width: notificationsColumn.width
+                height: Math.max(noteRow.implicitHeight, markReadBtn.implicitHeight) + Style.space(8)
+
+                Rectangle {
+                  anchors.fill: parent
+                  radius: Style.space(4)
+                  color: noteMouse.containsMouse
+                    ? Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+                    : "transparent"
+                }
+
+                MouseArea {
+                  id: noteMouse
+                  anchors.left: parent.left
+                  anchors.top: parent.top
+                  anchors.bottom: parent.bottom
+                  anchors.right: markReadBtn.left
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openUrl(modelData.url)
+                }
+
+                WidgetButton {
+                  id: markReadBtn
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.rightMargin: Style.space(8)
+                  bar: root.bar
+                  text: "Mark read"
+                  enabled: !markReadProc.running
+                  onPressed: function(buttonCode) {
+                    if (buttonCode === Qt.LeftButton)
+                      root.markRead(String(modelData.id || ""))
+                  }
+                }
+
+                Column {
+                  id: noteRow
+                  anchors.left: parent.left
+                  anchors.right: markReadBtn.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.leftMargin: Style.space(8)
+                  anchors.rightMargin: Style.space(8)
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(modelData.sender || "Tinkerer")
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: {
+                      var title = root.plain(root.snippet(modelData.title, 90))
+                      return title !== "" ? title : "Notification"
+                    }
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(root.relativeTime(modelData.createdAt))
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+              }
+            }
+          }
+        }
+
         Text {
           width: parent.width
-          visible: root.configured && root.posts.length === 0 && !root.busy && root.errorText === ""
+          visible: root.panelView === "feed" && root.configured && root.posts.length === 0 && !root.viewBusy && root.errorText === ""
           text: "No posts yet."
+          color: root.mutedForeground
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Text {
+          width: parent.width
+          visible: root.panelView === "notifications" && root.configured && root.notifications.length === 0 && !root.viewBusy && root.errorText === ""
+          text: "No notifications yet."
           color: root.mutedForeground
           font.family: root.contentFontFamily
           font.pixelSize: Style.font.body

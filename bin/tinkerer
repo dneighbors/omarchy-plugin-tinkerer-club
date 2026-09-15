@@ -19,8 +19,12 @@ usage() {
 Usage: tinkerer [--base-url URL] [--key-file PATH] [--limit N] <command>
 
 Commands:
-  status   Whether a key file exists. Never prints the key.
-  feed     Recent timeline posts as JSON.
+  status                 Whether a key file exists. Never prints the key.
+  feed                   Recent timeline posts as JSON.
+  notifications unread   Unread notification count as JSON.
+  notifications list     Recent notifications as JSON.
+  notifications mark-read ID  Mark one notification read.
+  notifications mark-all-read Mark all notifications read.
 EOF
 }
 
@@ -64,6 +68,7 @@ validate_base_url() {
 
 read_api_key() {
   local path="$1"
+  local -n _key_out="$2"
   if [[ ! -f "$path" ]]; then
     fail "Add your Tinkerer Club API key." "Write the raw member key to ${path}."
   fi
@@ -71,21 +76,21 @@ read_api_key() {
     fail "The API key file is not readable." "Check permissions on ${path}."
   fi
 
-  local key
-  key="$(tr -d '\r' <"$path" | sed -n '1p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-  if [[ -z "$key" ]]; then
+  local raw
+  raw="$(tr -d '\r' <"$path" | sed -n '1p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  if [[ -z "$raw" ]]; then
     fail "The API key file is empty." "Put the raw member key on the first line of ${path}."
   fi
-  printf '%s' "$key"
+  _key_out="$raw"
 }
 
 api_call() {
   local procedure="$1"
   local body="$2"
-  local origin key url response http_code payload
+  local origin key="" url response http_code payload
 
   origin="$(validate_base_url "$base_url")"
-  key="$(read_api_key "$key_file")"
+  read_api_key "$key_file" key
   url="${origin}/api/v1/${procedure}"
 
   response="$(
@@ -190,6 +195,101 @@ unwrap_items() {
   '
 }
 
+unwrap_count() {
+  jq -c '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          else . end
+        else . end;
+      def as_count:
+        if type == "number" then .
+        elif type == "string" and test("^[0-9]+$") then tonumber
+        elif type == "object" then
+          (.count // .unreadCount // .unread // .total // empty) | as_count
+        else empty end;
+      (unwrap | as_count // null) as $n
+      | if $n == null then error("no count")
+        else {ok:true, count: (if $n < 0 then 0 else ($n|floor) end)}
+        end
+    end
+  ' 2>/dev/null || fail "Tinkerer Club returned no unread count."
+}
+
+unwrap_notifications() {
+  jq -c --arg origin "$(validate_base_url "$base_url")" '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          elif has("json") then .json | unwrap
+          else . end
+        else . end;
+      def text($obj; $keys):
+        ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "";
+      def sender($item):
+        ([$item.sender, $item.actor, $item.from, $item.user, $item.member, $item.author]
+          | map(select(type == "object")) | .[0] // {}) as $src
+        | text($src; ["name","displayName","username","handle"]) as $nested
+        | text($item; ["senderName","actorName","fromName","authorName"]) as $flat
+        | if $nested != "" then $nested
+          elif $flat != "" then $flat
+          else "Tinkerer" end;
+      def resolve($value):
+        if ($value | type) != "string" or $value == "" then empty
+        else
+          if ($value | test("^https?://")) then $value
+          elif ($value | test("^[a-zA-Z][a-zA-Z0-9+.-]*:")) then empty
+          else ($origin + "/" + ($value | ltrimstr("/"))) end
+        end;
+      def item_url($item):
+        (text($item; ["href","url","webUrl","permalink","targetUrl","link"])) as $direct
+        | (if ($item.target | type) == "object" then
+             text($item.target; ["href","url","webUrl","permalink","targetUrl","link"])
+           else "" end) as $nested
+        | ([ $direct, $nested ] | map(select(. != "")) | .[0] // "") as $raw
+        | ([$raw] | map(resolve(.)) | .[0] // "");
+      def items:
+        (unwrap) as $p
+        | if ($p | type) == "array" then $p
+          elif ($p | type) == "object" then
+            ($p.items // $p.notifications // $p.results // [])
+          else [] end;
+      {
+        ok: true,
+        notifications: [
+          items[]
+          | select(type == "object")
+          | . as $item
+          | (text($item; ["id","notificationId"])) as $id
+          | select($id != "")
+          | {
+              id: $id,
+              sender: sender($item),
+              title: (text($item; ["title","headline","message","body","content","text","summary"]) | if . == "" then "Notification" else . end),
+              createdAt: text($item; ["createdAt","publishedAt","sentAt","timestamp","date","updatedAt"]),
+              url: item_url($item)
+            }
+        ]
+      }
+    end
+  '
+}
+
+unwrap_ok() {
+  jq -c --arg id "${1:-}" '
+    if type == "object" and .ok == false then .
+    elif $id != "" then {ok: true, id: $id}
+    else {ok: true}
+    end
+  '
+}
+
 cmd_status() {
   local path="$key_file"
   if [[ -f "$path" && -s "$path" ]]; then
@@ -204,6 +304,42 @@ cmd_feed() {
   local payload
   payload="$(api_call "post/timeline" "$(jq -nc --argjson limit "$feed_limit" '{limit:$limit, supportsSparsePages:false}')")"
   printf '%s' "$payload" | unwrap_items
+}
+
+cmd_notifications_unread() {
+  local payload
+  payload="$(api_call "notification/unreadCount" '{}')"
+  printf '%s' "$payload" | unwrap_count
+}
+
+cmd_notifications_list() {
+  local n="$feed_limit"
+  local payload
+  if (( n < 1 )); then
+    n=1
+  elif (( n > 50 )); then
+    n=50
+  fi
+  payload="$(api_call "notification/list" "$(jq -nc --argjson limit "$n" '{limit:$limit}')")"
+  printf '%s' "$payload" | unwrap_notifications
+}
+
+cmd_notifications_mark_read() {
+  local id="${1:-}"
+  id="${id#"${id%%[![:space:]]*}"}"
+  id="${id%"${id##*[![:space:]]}"}"
+  if [[ -z "$id" ]]; then
+    fail "A notification id is required." "Pass the id as: notifications mark-read ID"
+  fi
+  local payload
+  payload="$(api_call "notification/markRead" "$(jq -nc --arg id "$id" '{id:$id}')")"
+  printf '%s' "$payload" | unwrap_ok "$id"
+}
+
+cmd_notifications_mark_all_read() {
+  local payload
+  payload="$(api_call "notification/markAllRead" '{}')"
+  printf '%s' "$payload" | unwrap_ok
 }
 
 while [[ $# -gt 0 ]]; do
@@ -241,6 +377,16 @@ command="${1:-}"
 case "$command" in
   status) cmd_status ;;
   feed) cmd_feed ;;
+  notifications)
+    case "${2:-}" in
+      unread) cmd_notifications_unread ;;
+      list) cmd_notifications_list ;;
+      mark-read) cmd_notifications_mark_read "${3:-}" ;;
+      mark-all-read) cmd_notifications_mark_all_read ;;
+      "") fail "Unknown command: notifications" ;;
+      *) fail "Unknown command: $2" ;;
+    esac
+    ;;
   "") usage; exit 2 ;;
   *) fail "Unknown command: $command" ;;
 esac
