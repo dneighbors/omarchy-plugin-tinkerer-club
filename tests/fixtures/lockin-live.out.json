@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "current": {
+    "id": "cmu22rnpot8cz01o9btmrgacj",
+    "title": "Omarchy Tinkerer Club Lockin Plugin",
+    "startedAt": "2026-09-15T02:51:02.216Z",
+    "expiresAt": "2026-09-15T03:51:02.216Z",
+    "automaticallyEnded": false
+  },
+  "participants": [
+    {
+      "id": "part1",
+      "title": "Omarchy Tinkerer Club Lockin Plugin",
+      "startedAt": "2026-09-15T02:51:02.216Z",
+      "expiresAt": "2026-09-15T03:51:02.216Z",
+      "name": "Derek Neighbors"
+    }
+  ],
+  "serverNow": "2026-09-15T02:52:34.903Z",
+  "onboarded": true
+}

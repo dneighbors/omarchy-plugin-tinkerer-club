@@ -595,10 +595,11 @@ refresh = p[p.find("function refresh()"):p.find("function refreshUnread")]
 feed = p[p.find("function applyFeed"):p.find("function applyUnread")]
 unread = p[p.find("function applyUnread"):p.find("function applyNotifications")]
 ok = "refreshFeed()" in timer and "refreshUnread()" in timer and "refreshNotifications" not in timer
-ok = ok and "refreshFeed()" in opened and 'panelView = "feed"' in opened
+ok = ok and ("refreshFeed()" in opened or "refresh()" in opened) and 'panelView = "feed"' in opened
 ok = ok and "if (!root.opened)" in refresh_n
 ok = ok and "opened && root.panelView === \"notifications\"" in refresh
 ok = ok and "panelView === \"feed\"" in feed
+ok = ok and "panelView === \"lockin\"" in p
 ok = ok and unread.count("unreadCount") >= 1 and "unreadCount" not in p[p.find("function applyNotifications"):p.find("onOpenedChanged")]
 sys.exit(0 if ok else 1)
 PY
