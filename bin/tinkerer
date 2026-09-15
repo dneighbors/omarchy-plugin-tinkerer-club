@@ -323,7 +323,7 @@ unwrap_lockin_state() {
         | if $id == "" then null
           else {
             id: $id,
-            title: text($c; ["title"]) // "LockIn",
+            title: (text($c; ["title"]) // "LockIn"),
             startedAt: text($c; ["startedAt"]),
             expiresAt: text($c; ["expiresAt"]),
             automaticallyEnded: ($c.automaticallyEnded // false)
@@ -355,7 +355,7 @@ unwrap_lockin_state() {
             | select($id != "")
             | {
                 id: $id,
-                title: text($item; ["title"]) // "LockIn",
+                title: (text($item; ["title"]) // "LockIn"),
                 startedAt: text($item; ["startedAt"]),
                 expiresAt: text($item; ["expiresAt"]),
                 name: participant_name($item)
