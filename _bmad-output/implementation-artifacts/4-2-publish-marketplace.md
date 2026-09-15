@@ -1,6 +1,6 @@
 # Story 4.2: Publish to Omarchy marketplace
 
-Status: review
+Status: done
 
 ## Story
 
@@ -41,12 +41,12 @@ so that **members can install from the catalog**.
   - [x] 1.2 Ensure each script remains self-contained (PATH-injected stub `curl`, temp key file, no live origin). Do not source `bin/tinkerer`.
   - [x] 1.3 Document in Dev Notes only (not README — 4.3 owns install docs): CI invokes `./tests/all.sh`.
 
-- [ ] **Task 2 — GitHub Actions validate-on-main** (AC: 2, 3)
+- [x] **Task 2 — GitHub Actions validate-on-main** (AC: 2, 3)
   - [x] 2.1 Create `.github/workflows/ci.yml` triggered on `push` to `main`, `pull_request`, and `workflow_dispatch`. Use `permissions: contents: read`, concurrency group, `ubuntu-24.04`, 5-minute timeout.
   - [x] 2.2 Check out this plugin to `plugin/` with pinned `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (# v7.0.1).
   - [x] 2.3 Sparse-checkout Omarchy validator only: `basecamp/omarchy` ref `7be59e1f4b7451d352d4673c560168290792590f` (quattro, 2026-08-16) path `bin/omarchy-plugin-validate` into `omarchy/` — same pin as `ssupt/omarchy-media-controls`.
   - [x] 2.4 Install `jq` (tests depend on it). Run `./plugin/tests/all.sh` then `./omarchy/bin/omarchy-plugin-validate ./plugin`.
-  - [ ] 2.5 Push to `main` and confirm the workflow is green before marketplace submission (AC5 depends on green `main`).
+  - [x] 2.5 Push to `main` and confirm the workflow is green before marketplace submission (AC5 depends on green `main`).
 
 - [x] **Task 3 — Marketplace preflight audit** (AC: 1, 2, 4)
   - [x] 3.1 Confirm repo is public and default branch is `main`.
@@ -57,22 +57,22 @@ so that **members can install from the catalog**.
   - [x] 3.6 Security baseline self-check: grep repo for `curl.*\|`, `wget.*\|`, unpinned `cargo install --git`, `NOPASSWD`, `pkexec`, `/tmp/*.pid` patterns in runtime paths (`bin/`, `*.qml`, root README). Tests/fixtures mentioning curl argv are expected and excluded from runtime concern.
   - [ ] 3.7 Optional: add root `preview.png` (screenshot of bar/panel). Marketplace auto-optimizes; not required for validation pass.
 
-- [ ] **Task 4 — Open marketplace submission issue** (AC: 5)
-  - [ ] 4.1 Use issue form https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml or CLI per `SUBMISSION.md`. Title: `[Plugin]: Tinkerer Club`.
-  - [ ] 4.2 Body must preserve all six headings in order (`Repository URL`, `Category`, `Tags`, `Suggest a missing tag`, `Maintainer notes`, `Submission checklist`) and exact checklist text from `SUBMISSION.md`.
-  - [ ] 4.3 Locked listing metadata for this plugin:
+- [x] **Task 4 — Open marketplace submission issue** (AC: 5)
+  - [x] 4.1 Use issue form https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml or CLI per `SUBMISSION.md`. Title: `[Plugin]: Tinkerer Club`.
+  - [x] 4.2 Body must preserve all six headings in order (`Repository URL`, `Category`, `Tags`, `Suggest a missing tag`, `Maintainer notes`, `Submission checklist`) and exact checklist text from `SUBMISSION.md`.
+  - [x] 4.3 Locked listing metadata for this plugin:
         - Repository URL: `https://github.com/dneighbors/omarchy-plugin-tinkerer-club` (no trailing slash, no `/tree/main`)
         - Category: `Widgets` (bar widget; `Social` is not an allowed marketplace category)
         - Tags: `bar`, `system` (one to three from allowed list; both apply)
         - Maintainer notes: unofficial Tinkerer Club integration; requires member API key file documented in README
-  - [ ] 4.4 All five checklist boxes checked only after Tasks 1–3 are merged to `main` and CI is green.
-  - [ ] 4.5 Record marketplace issue URL and validated commit SHA in Dev Agent Record. Do not open duplicate issues on retry — edit the existing issue to re-run validation.
+  - [x] 4.4 All five checklist boxes checked only after Tasks 1–3 are merged to `main` and CI is green.
+  - [x] 4.5 Record marketplace issue URL and validated commit SHA in Dev Agent Record. Do not open duplicate issues on retry — edit the existing issue to re-run validation.
 
-- [ ] **Task 5 — Confirm automated validation** (AC: 5, 6)
-  - [ ] 5.1 Wait for `github-actions[bot]` **Marketplace validation** comment on the submission issue. Required ✅ lines: public repo, valid manifest, README/license, Quattro compatibility at commit matching current `main`.
-  - [ ] 5.2 **Automated security baseline** comment should be `passed` or acceptable `review-required` without `security-needs-fixes` / selectively blocking findings. If `needs-fixes`, fix on `main`, let CI go green, edit issue to re-validate — do not duplicate the issue.
-  - [ ] 5.3 Do **not** add README catalog install instructions (Story 4.3). Do **not** wait for maintainer `approved-and-verified` or listing URL — out of scope for 4.2.
-  - [ ] 5.4 Update story status to `done` and sprint-status only after AC5 bot comment is green. Record issue link in Completion Notes.
+- [x] **Task 5 — Confirm automated validation** (AC: 5, 6)
+  - [x] 5.1 Wait for `github-actions[bot]` **Marketplace validation** comment on the submission issue. Required ✅ lines: public repo, valid manifest, README/license, Quattro compatibility at commit matching current `main`.
+  - [x] 5.2 **Automated security baseline** comment should be `passed` or acceptable `review-required` without `security-needs-fixes` / selectively blocking findings. If `needs-fixes`, fix on `main`, let CI go green, edit issue to re-validate — do not duplicate the issue.
+  - [x] 5.3 Do **not** add README catalog install instructions (Story 4.3). Do **not** wait for maintainer `approved-and-verified` or listing URL — out of scope for 4.2.
+  - [x] 5.4 Update story status to `done` and sprint-status only after AC5 bot comment is green. Record issue link in Completion Notes.
 
 ## Dev Notes
 
@@ -316,7 +316,17 @@ claude-opus-4-6 (Task 3 preflight audit); composer (Task 1 CI harness, Task 2 CI
 | 2.2 Plugin checkout | PASS | Pinned `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (# v7.0.1) → `plugin/`. |
 | 2.3 Omarchy validator sparse-checkout | PASS | `basecamp/omarchy@7be59e1f4b7451d352d4673c560168290792590f` → `omarchy/bin/omarchy-plugin-validate`. |
 | 2.4 Test + validate steps | PASS | `apt-get install jq`; `./plugin/tests/all.sh` then `./omarchy/bin/omarchy-plugin-validate ./plugin`. Local `./tests/all.sh` exit 0; pinned validator exit 0. |
-| 2.5 Push + green CI | DEFERRED | Push to `main` not performed per dev instructions; required before Task 4 submission. |
+| 2.5 Push + green CI | PASS | Merged PR #2; main CI run 34924096667 green at `3ec243c8363d04f37c53adb739c0b9f31654ca59`. |
+
+**Task 4–5 — Marketplace submission (2026-09-15)**
+
+| Subtask | Result | Notes |
+|---|---|---|
+| 4.1–4.5 Issue opened | PASS | https://github.com/omacom/omarchy-plugin-marketplace/issues/6993 — labels `submission`, `validated` |
+| 5.1 Marketplace validation | PASS | ✅ public repo, manifest, README/license, Quattro at `3ec243c` |
+| 5.2 Security baseline | PASS | `passed` at commit `3ec243c…`, no findings |
+| 5.3 Scope | PASS | README unchanged; no maintainer approval wait |
+| 5.4 Story done | PASS | sprint-status updated |
 
 ### File List
 
@@ -346,10 +356,11 @@ Review date: 2026-09-14. Findings: 7 (0 critical, 2 high, 4 medium, 1 low). Reco
 - [x] F5 — update story + sprint status to `review`
 - [x] F6 — env key unset in `unread.sh`
 - [x] F7 — File List includes sprint-status
-- [ ] F1/F2 — merge to `main`, green CI, marketplace bot validation (Tasks 2.5, 4, 5)
+- [x] F1/F2 — merge to `main`, green CI, marketplace bot validation (Tasks 2.5, 4, 5)
 
 ## Change Log
 
+- 2026-09-15: Tasks 4–5 complete — marketplace issue #6993 validated at `3ec243c`.
 - 2026-09-14: Code review — 4 fixes applied (ci.yml PR filter, unread.sh unset, status tracking).
 - 2026-09-14: Task 1 — add `tests/all.sh` fixture test runner for CI (AC3).
 - 2026-09-14: Task 2.1–2.4 — add `.github/workflows/ci.yml` validate-on-main workflow (AC2, AC3).

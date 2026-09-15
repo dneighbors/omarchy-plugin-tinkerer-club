@@ -78,7 +78,7 @@ development_status:
   # ============================================
   epic-4: in-progress
   4-1-standing-chores: done                    # Story: 4.1 | BenjiID: 52c1c6f9-e879-4939-9233-33f9fa3c6c23
-  4-2-publish-marketplace: review               # Story: 4.2 | BenjiID: 4a261c53-ffac-43dc-aec4-78f57d202516
+  4-2-publish-marketplace: done                  # Story: 4.2 | BenjiID: 4a261c53-ffac-43dc-aec4-78f57d202516
   4-3-marketplace-listing-live: backlog        # Story: 4.3 | BenjiID: 625248d6-05f9-45dc-b7ef-511679aac628
   epic-4-retrospective: optional
 
