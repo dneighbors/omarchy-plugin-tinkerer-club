@@ -45,13 +45,13 @@ development_status:
 
   # ============================================
   # Epic 1: Club Feed (MVP)
-  # Status: IN-PROGRESS (scaffold on bar, live key not verified)
+  # Status: DONE (live key verified 2026-09-14; feed/list/refresh already shipped)
   # ============================================
-  epic-1: in-progress
-  1-1-timeline-fetch: in-progress             # Story: 1.1 | BenjiID: 58ff1d97-4ffc-4fe9-9e0c-7846505c4a4f
-  1-2-panel-feed-list: in-progress            # Story: 1.2 | BenjiID: b9235430-28b9-4ab3-a732-ce1072020276
-  1-3-new-activity-dot: in-progress           # Story: 1.3 | BenjiID: 86f9fcd5-1769-48c8-8a72-1302e34d7989
-  1-4-feed-refresh-and-errors: in-progress    # Story: 1.4 | BenjiID: e48079da-76e9-46f7-a98e-24cd443e83be
+  epic-1: done
+  1-1-timeline-fetch: done                    # Story: 1.1 | BenjiID: 58ff1d97-4ffc-4fe9-9e0c-7846505c4a4f
+  1-2-panel-feed-list: done                   # Story: 1.2 | BenjiID: b9235430-28b9-4ab3-a732-ce1072020276
+  1-3-new-activity-dot: done                  # Story: 1.3 | BenjiID: 86f9fcd5-1769-48c8-8a72-1302e34d7989
+  1-4-feed-refresh-and-errors: done           # Story: 1.4 | BenjiID: e48079da-76e9-46f7-a98e-24cd443e83be
   epic-1-retrospective: optional
 
   # ============================================
