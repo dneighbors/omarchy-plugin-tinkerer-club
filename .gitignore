@@ -8,3 +8,11 @@
 secrets/
 .cache/
 *.log
+
+# Agent/BMAD workflow trees stay on disk for local development but
+# must not ship in the published plugin checkout.
+.agents/
+.claude/
+.cursor/
+_bmad/
+_bmad-output/
