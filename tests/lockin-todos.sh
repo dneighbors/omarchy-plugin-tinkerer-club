@@ -23,17 +23,9 @@ TEST_KEY="test-key-not-real-SECRET99"
 key_file="$work/key"
 printf '%s\n' "$TEST_KEY" > "$key_file"
 
-cat > "$work/bin/curl" <<'EOS'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "${CURL_LOG:?}"
-if [ -n "${CURL_BODY:-}" ] && [ -f "${CURL_BODY}" ]; then
-  cat "${CURL_BODY}"
-  printf '\n%s' "${CURL_CODE:-200}"
-  exit 0
-fi
-exit 1
-EOS
-chmod +x "$work/bin/curl"
+# shellcheck source=tests/lib/assert-curl-auth.sh
+source "$root/tests/lib/assert-curl-auth.sh"
+"$root/tests/lib/install-fake-curl.sh" "$work"
 export CURL_LOG="$work/curl.log"
 export PATH="$work/bin:$PATH"
 export TINKERER_TODO_UUID="11111111-1111-4111-8111-111111111111"

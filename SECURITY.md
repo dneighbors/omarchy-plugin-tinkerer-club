@@ -16,7 +16,9 @@ chmod 600 ~/.config/omarchy/secrets/tinkerer-club-api-key
 
 Do not put the key in this repository, in `shell.json`, or in an issue.
 
-The helper reads that file and sends it only as `x-api-key` to the configured HTTPS origin. It never prints the key.
+The helper reads that file and sends it only as `x-api-key` to the configured HTTPS origin. It never prints the key. The header is passed to `curl` from a mode-`0600` temporary header file (`-H @file`), so the key value does not appear in process arguments.
+
+API responses are written to a mode-`0600` temporary file with a strict size ceiling (262144 bytes). Oversized bodies are rejected before parsing.
 
 Revoke the key in Tinkerer Club immediately if you think it leaked.
 

@@ -23,17 +23,9 @@ TEST_KEY="test-key-not-real-SECRET99"
 key_file="$work/key"
 printf '%s\n' "$TEST_KEY" > "$key_file"
 
-cat > "$work/bin/curl" <<'EOS'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "${CURL_LOG:?}"
-if [ -n "${CURL_BODY:-}" ] && [ -f "${CURL_BODY}" ]; then
-  cat "${CURL_BODY}"
-  printf '\n%s' "${CURL_CODE:-200}"
-  exit 0
-fi
-exit 1
-EOS
-chmod +x "$work/bin/curl"
+# shellcheck source=tests/lib/assert-curl-auth.sh
+source "$root/tests/lib/assert-curl-auth.sh"
+"$root/tests/lib/install-fake-curl.sh" "$work"
 export CURL_LOG="$work/curl.log"
 export PATH="$work/bin:$PATH"
 
@@ -73,7 +65,7 @@ assert_post_start() {
     *"app.tinkerer.club"*) bad "$label hit live origin" ;;
     *) pass "$label no live origin" ;;
   esac
-  body=$(printf '%s' "$log" | grep -oE '\{[^}]*\}' | tail -1 || true)
+  body=$(printf '%s' "$log" | sed -n 's/.*--data \(.*\) -o .*/\1/p')
   if [ -n "$want_body" ] && [ "$body" = "$want_body" ]; then
     pass "$label POST body $want_body"
   elif [ -z "$want_body" ] && { [ "$body" = "{}" ] || [ -z "$body" ]; }; then

@@ -24,17 +24,9 @@ TEST_KEY="test-key-not-real-SECRET99"
 key_file="$work/key"
 printf '%s\n' "$TEST_KEY" > "$key_file"
 
-cat > "$work/bin/curl" <<'EOS'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "${CURL_LOG:?}"
-if [ -n "${CURL_BODY:-}" ] && [ -f "${CURL_BODY}" ]; then
-  cat "${CURL_BODY}"
-  printf '\n%s' "${CURL_CODE:-200}"
-  exit 0
-fi
-exit 1
-EOS
-chmod +x "$work/bin/curl"
+# shellcheck source=tests/lib/assert-curl-auth.sh
+source "$root/tests/lib/assert-curl-auth.sh"
+"$root/tests/lib/install-fake-curl.sh" "$work"
 export CURL_LOG="$work/curl.log"
 export PATH="$work/bin:$PATH"
 
@@ -77,10 +69,7 @@ assert_post_list() {
     *"Content-Type: application/json"*) pass "$label Content-Type" ;;
     *) bad "$label Content-Type"; printf '  log=%s\n' "$log" ;;
   esac
-  case "$log" in
-    *"x-api-key:"*) pass "$label x-api-key header" ;;
-    *) bad "$label x-api-key"; printf '  log=%s\n' "$log" ;;
-  esac
+  assert_api_key_via_header_file "$label" "$log" "$TEST_KEY"
   body=$(printf '%s' "$log" | grep -oE '\{"limit":[0-9]+\}' | head -1 || true)
   if [ -n "$body" ] && printf '%s' "$body" | jq -e 'has("limit") and (.limit | type == "number")' >/dev/null 2>&1; then
     limit=$(printf '%s' "$body" | jq -r '.limit')
