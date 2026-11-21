@@ -65,6 +65,12 @@ Panel {
   property bool lockinWatchdogNotice: false
   property var lockinTodos: []
   property string lockinTodoDraft: ""
+  property var liveEvent: null
+  // Drop a previously fetched live event once the key goes away, since
+  // refreshLive() stops running while unconfigured.
+  onConfiguredChanged: if (!configured) liveEvent = null
+  readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
+  readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
   readonly property bool lockinEarlyFinish: {
     var tick = root.lockinClockTick
@@ -81,7 +87,7 @@ Panel {
       ? (stateProc.running || startProc.running || finishProc.running || todosProc.running
         || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
       : feedProc.running)
-  readonly property bool busy: statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
+  readonly property bool busy: liveProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
 
   function syncViewMessages() {
     if (root.panelView === "notifications") {
@@ -183,6 +189,26 @@ Panel {
       stateProc.command = root.cmd(["lockin", "state"])
       stateProc.running = true
     }
+  }
+
+  function refreshLive() {
+    if (!root.configured || liveProc.running)
+      return
+    liveProc.command = root.cmd(["events", "live"])
+    liveProc.running = true
+  }
+
+  function applyLive(data) {
+    // A failed liveBanner call keeps the last answer; the feed and
+    // notifications views already report auth and network errors.
+    if (data && data.ok === true)
+      liveEvent = data.live && data.live.id ? data.live : null
+  }
+
+  function liveWhen(value) {
+    var stamp = Date.parse(value)
+    if (!isFinite(stamp)) return ""
+    return Qt.formatDateTime(new Date(stamp), "ddd h:mm AP")
   }
 
   function refreshLockinTodos() {
@@ -312,6 +338,7 @@ Panel {
   }
 
   function refresh() {
+    root.refreshLive()
     if (root.opened && root.panelView === "notifications")
       root.refreshNotifications()
     else if (root.opened && root.panelView === "lockin") {
@@ -545,6 +572,7 @@ Panel {
         try { data = JSON.parse(text) } catch (e) { return }
         root.applyStatus(data)
         if (root.configured && root.opened) root.refreshFeed()
+        if (root.configured) root.refreshLive()
       }
     }
   }
@@ -561,6 +589,17 @@ Panel {
   }
 
   Process { id: browserProc }
+
+  Process {
+    id: liveProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyLive(data)
+      }
+    }
+  }
 
   Process {
     id: unreadProc
@@ -712,6 +751,8 @@ Panel {
         root.refreshUnread()
       if (root.configured && root.lockinCurrent !== null)
         root.refreshLockinState()
+      if (root.configured)
+        root.refreshLive()
     }
   }
 
@@ -759,6 +800,69 @@ Panel {
             enabled: !root.viewBusy
             onPressed: function(buttonCode) {
               if (buttonCode === Qt.LeftButton) root.refresh()
+            }
+          }
+        }
+
+        Item {
+          id: liveBanner
+          width: parent.width
+          visible: root.configured && root.liveEvent !== null
+          height: visible ? liveBannerRow.implicitHeight + Style.space(12) : 0
+
+          Rectangle {
+            anchors.fill: parent
+            radius: Style.space(4)
+            color: liveBannerMouse.containsMouse
+              ? Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+              : "transparent"
+            border.color: root.liveNow ? Color.urgent : root.mutedForeground
+            border.width: 1
+          }
+
+          MouseArea {
+            id: liveBannerMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: if (root.liveEvent) root.openUrl(root.liveEvent.url)
+          }
+
+          RowLayout {
+            id: liveBannerRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: Style.space(8)
+            spacing: Style.space(8)
+
+            Text {
+              textFormat: Text.PlainText
+              text: root.liveNow ? "\u25cf LIVE" : "Next live"
+              color: root.liveNow ? Color.urgent : root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Text {
+              Layout.fillWidth: true
+              textFormat: Text.PlainText
+              text: root.plain(root.snippet(root.liveTitle, 70))
+              color: root.contentForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.body
+              elide: Text.ElideRight
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              text: root.liveNow
+                ? "Join"
+                : root.plain(root.liveWhen(root.liveEvent ? root.liveEvent.startsAt : ""))
+              color: root.liveNow ? Color.accent : root.mutedForeground
+              font.family: root.contentFontFamily
+              font.pixelSize: Style.font.bodySmall
             }
           }
         }
