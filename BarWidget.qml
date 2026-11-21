@@ -23,6 +23,9 @@ BarWidget {
     var n = Number(panelItem.lockinRemainingMs)
     return isNaN(n) ? 0 : n
   }
+  readonly property bool liveNow: panelItem ? panelItem.liveNow === true : false
+  readonly property string liveTitle: panelItem && panelItem.liveTitle ? String(panelItem.liveTitle) : ""
+  readonly property bool showLiveCue: liveNow && !opened
   readonly property bool showSessionCue: lockinLive && !opened && unreadCount <= 0
 
   property var panelItem: null
@@ -87,11 +90,13 @@ BarWidget {
     text: "\ud83e\udd9e"
     tooltipText: root.opened
       ? "Close Tinkerer Club"
-      : (root.unreadCount > 0
-          ? ("Tinkerer Club · " + root.unreadCount + " unread")
-          : (root.showSessionCue
-              ? ("Tinkerer Club · LockIn " + root.formatDuration(root.lockinRemainingMs) + " remaining")
-              : "Tinkerer Club"))
+      : root.showLiveCue
+        ? ("Tinkerer Club · Live now: " + root.liveTitle)
+        : (root.unreadCount > 0
+            ? ("Tinkerer Club · " + root.unreadCount + " unread")
+            : (root.showSessionCue
+                ? ("Tinkerer Club · LockIn " + root.formatDuration(root.lockinRemainingMs) + " remaining")
+                : "Tinkerer Club"))
 
     Rectangle {
       id: unreadBadge
@@ -141,6 +146,19 @@ BarWidget {
         font.bold: true
         color: Color.accent
       }
+    }
+
+    Rectangle {
+      id: liveCue
+      visible: root.showLiveCue
+      width: 6
+      height: 6
+      radius: 3
+      color: Color.urgent
+      anchors.left: parent.left
+      anchors.top: parent.top
+      anchors.leftMargin: 1
+      anchors.topMargin: 1
     }
 
     Rectangle {
