@@ -66,6 +66,9 @@ Panel {
   property var lockinTodos: []
   property string lockinTodoDraft: ""
   property var liveEvent: null
+  // Drop a previously fetched live event once the key goes away, since
+  // refreshLive() stops running while unconfigured.
+  onConfiguredChanged: if (!configured) liveEvent = null
   readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
   readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
@@ -748,7 +751,7 @@ Panel {
         root.refreshUnread()
       if (root.configured && root.lockinCurrent !== null)
         root.refreshLockinState()
-      if (root.configured && !root.opened)
+      if (root.configured)
         root.refreshLive()
     }
   }
@@ -804,7 +807,7 @@ Panel {
         Item {
           id: liveBanner
           width: parent.width
-          visible: root.liveEvent !== null
+          visible: root.configured && root.liveEvent !== null
           height: visible ? liveBannerRow.implicitHeight + Style.space(12) : 0
 
           Rectangle {
