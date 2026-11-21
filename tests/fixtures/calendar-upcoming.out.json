@@ -1,0 +1,5 @@
+{"ok":true,"events":[
+ {"id":"evt-now","title":"Build along","type":"ONLINE","startsAt":"2026-11-21T18:00:00.000Z","endsAt":"2026-11-21T20:00:00.000Z","isLive":true,"url":"https://app.tinkerer.club/live/evt-now"},
+ {"id":"evt-soon","title":"Office hours","type":"ONLINE","startsAt":"2026-11-22T17:00:00.000Z","endsAt":"2026-11-22T18:00:00.000Z","isLive":false,"url":"https://cal.test.invalid/events/evt-soon"},
+ {"id":"evt-later","title":"Demo night","type":"ONLINE","startsAt":"2026-12-05T02:00:00.000Z","endsAt":"2026-12-05T04:00:00.000Z","isLive":false,"url":"https://cal.test.invalid/events/evt-later"}
+]}

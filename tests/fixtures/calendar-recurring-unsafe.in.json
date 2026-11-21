@@ -1,0 +1,4 @@
+{"path":"event.calendar","data":[
+ {"id":"evt-weekly","title":"","startsAt":"2026-10-01T17:00:00.000Z","endsAt":"2026-10-01T18:00:00.000Z","occurrenceStart":"2026-11-26T17:00:00.000Z","isRecurring":true,"url":"javascript:alert(1)"},
+ {"id":"evt-weekly","title":"","startsAt":"2026-10-01T17:00:00.000Z","endsAt":"2026-10-01T18:00:00.000Z","occurrenceStart":"2026-11-26T17:00:00.000Z","isRecurring":true,"url":"javascript:alert(1)"}
+]}

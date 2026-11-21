@@ -1,0 +1,3 @@
+{"ok":true,"events":[
+ {"id":"evt-weekly","title":"Event","type":"","startsAt":"2026-11-26T17:00:00.000Z","endsAt":"2026-11-26T18:00:00Z","isLive":false,"url":"https://cal.test.invalid/events/evt-weekly"}
+]}
