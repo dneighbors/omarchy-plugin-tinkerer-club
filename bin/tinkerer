@@ -35,6 +35,7 @@ Commands:
   lockin todo-update ID true|false  Set LockIn todo completed flag.
   lockin todo-delete ID Delete a LockIn todo.
   events live           Current or next live broadcast as JSON.
+  events upcoming       Upcoming events (next 62 days) as JSON.
 EOF
 }
 
@@ -727,6 +728,99 @@ cmd_events_live() {
   printf '%s' "$payload" | unwrap_live_banner
 }
 
+unwrap_calendar() {
+  jq -c --arg origin "$(validate_base_url "$base_url")" --arg now "${TINKERER_NOW:-}" --argjson limit "$1" '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          elif has("json") then .json | unwrap
+          else . end
+        else . end;
+      def text($obj; $keys):
+        ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "";
+      def stamp($value):
+        if ($value | type) != "string" or $value == "" then null
+        else ($value | sub("\\.[0-9]+"; "") | sub("(?<z>[+-][0-9]{2}):?[0-9]{2}$"; "Z") | try fromdateiso8601 catch null)
+        end;
+      def resolve($value):
+        if ($value | type) != "string" or $value == "" then empty
+        elif ($value | test("^https?://")) then $value
+        elif ($value | test("^[a-zA-Z][a-zA-Z0-9+.-]*:")) then empty
+        else ($origin + "/" + ($value | ltrimstr("/"))) end;
+      def items:
+        (unwrap) as $p
+        | if ($p | type) == "array" then $p
+          elif ($p | type) == "object" then ($p.events // $p.items // $p.results // [])
+          else [] end;
+      (if $now != "" then ($now | tonumber) else now end) as $t
+      | {
+          ok: true,
+          events: (
+            [
+              items[]
+              | select(type == "object")
+              | . as $e
+              | (text($e; ["id","eventId"])) as $id
+              | select($id != "")
+              | (text($e; ["broadcastStatus"]) | ascii_upcase) as $broadcast
+              | (text($e; ["status","state"]) | ascii_upcase) as $status
+              | select(([$broadcast, $status] | map(select(. == "ENDED" or . == "CANCELED" or . == "CANCELLED")) | length) == 0)
+              | (text($e; ["startsAt","startAt","startTime","scheduledAt"])) as $base_starts
+              | (text($e; ["endsAt","endAt","endTime"])) as $base_ends
+              | (text($e; ["occurrenceStart"])) as $occurrence
+              | (stamp($base_starts)) as $bs
+              | (stamp($base_ends)) as $bf
+              | (if $occurrence != "" and stamp($occurrence) != null then $occurrence else $base_starts end) as $starts
+              | (stamp($starts)) as $s
+              # A recurring occurrence keeps the series end time; shift it by the same offset.
+              | (if $bf != null and $bs != null and $s != null then $s + ($bf - $bs) else $bf end) as $f
+              | (if $starts == $base_starts or $f == null then $base_ends else ($f | todateiso8601) end) as $ends
+              | select($s != null)
+              | select(if $f != null then $f > $t else $s >= $t end)
+              | {
+                  id: $id,
+                  title: (text($e; ["title","name"]) | if . == "" then "Event" else . end),
+                  type: text($e; ["type"]),
+                  startsAt: $starts,
+                  endsAt: $ends,
+                  isLive: ($broadcast == "LIVE" or ($s <= $t)),
+                  url: (
+                    [text($e; ["href","url","webUrl","permalink","link"])]
+                    | map(resolve(.))
+                    | .[0] // ($origin + "/events/" + ($id | @uri))
+                  ),
+                  _s: $s
+                }
+            ]
+            | unique_by(.id + "|" + .startsAt)
+            | sort_by(._s)
+            | map(del(._s))
+            | .[0:$limit]
+          )
+        }
+    end
+  '
+}
+
+cmd_events_upcoming() {
+  local n="$feed_limit" window payload
+  if (( n < 1 )); then
+    n=1
+  elif (( n > 50 )); then
+    n=50
+  fi
+  # event.calendar rejects windows longer than 62 days.
+  window="$(jq -nc --arg now "${TINKERER_NOW:-}" '
+    (if $now != "" then ($now | tonumber) else now end | floor) as $t
+    | {from: ($t | todateiso8601), to: (($t + 62 * 86400) | todateiso8601)}
+  ')"
+  payload="$(api_call "event/calendar" "$window")"
+  printf '%s' "$payload" | unwrap_calendar "$n"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base-url)
@@ -803,6 +897,7 @@ case "$command" in
   events)
     case "${2:-}" in
       live) cmd_events_live ;;
+      upcoming) cmd_events_upcoming ;;
       "") fail "Unknown command: events" ;;
       *) fail "Unknown command: $2" ;;
     esac

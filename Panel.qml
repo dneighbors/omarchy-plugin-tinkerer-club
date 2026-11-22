@@ -66,9 +66,12 @@ Panel {
   property var lockinTodos: []
   property string lockinTodoDraft: ""
   property var liveEvent: null
+  property var events: []
+  property string eventsErrorText: ""
+  property string eventsStatusHint: ""
   // Drop a previously fetched live event once the key goes away, since
   // refreshLive() stops running while unconfigured.
-  onConfiguredChanged: if (!configured) liveEvent = null
+  onConfiguredChanged: if (!configured) { liveEvent = null; events = [] }
   readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
   readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
@@ -83,11 +86,12 @@ Panel {
   }
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
   readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running
+    : root.panelView === "events" ? eventsProc.running
     : (root.panelView === "lockin"
       ? (stateProc.running || startProc.running || finishProc.running || todosProc.running
         || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
       : feedProc.running)
-  readonly property bool busy: liveProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
+  readonly property bool busy: liveProc.running || eventsProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
 
   function syncViewMessages() {
     if (root.panelView === "notifications") {
@@ -96,6 +100,9 @@ Panel {
     } else if (root.panelView === "lockin") {
       errorText = lockinErrorText
       statusHint = lockinStatusHint
+    } else if (root.panelView === "events") {
+      errorText = eventsErrorText
+      statusHint = eventsStatusHint
     } else {
       errorText = feedErrorText
       statusHint = feedStatusHint
@@ -209,6 +216,36 @@ Panel {
     var stamp = Date.parse(value)
     if (!isFinite(stamp)) return ""
     return Qt.formatDateTime(new Date(stamp), "ddd h:mm AP")
+  }
+
+  function refreshEvents() {
+    if (!eventsProc.running) {
+      eventsProc.command = root.cmd(["events", "upcoming"])
+      eventsProc.running = true
+    }
+  }
+
+  function applyEvents(data) {
+    if (data && data.ok === true && Array.isArray(data.events)) {
+      root.events = data.events
+      eventsErrorText = ""
+      eventsStatusHint = ""
+    } else {
+      eventsErrorText = (data && data.error) || "Could not load events."
+      eventsStatusHint = (data && data.hint) || ""
+    }
+    if (root.panelView === "events") {
+      errorText = eventsErrorText
+      statusHint = eventsStatusHint
+    }
+  }
+
+  // Absolute local time for an event, e.g. "Sat Nov 22 · 9:00 AM".
+  function eventWhen(startsAt, isLive) {
+    if (isLive) return "Live now"
+    var stamp = Date.parse(startsAt)
+    if (!isFinite(stamp)) return ""
+    return Qt.formatDateTime(new Date(stamp), "ddd MMM d \u00b7 h:mm AP")
   }
 
   function refreshLockinTodos() {
@@ -344,7 +381,9 @@ Panel {
     else if (root.opened && root.panelView === "lockin") {
       root.refreshLockinState()
       root.refreshLockinTodos()
-    } else
+    } else if (root.opened && root.panelView === "events")
+      root.refreshEvents()
+    else
       root.refreshFeed()
   }
 
@@ -589,6 +628,17 @@ Panel {
   }
 
   Process { id: browserProc }
+
+  Process {
+    id: eventsProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyEvents(data)
+      }
+    }
+  }
 
   Process {
     id: liveProc
@@ -897,6 +947,19 @@ Panel {
 
           WidgetButton {
             bar: root.bar
+            text: "Events"
+            active: root.panelView === "events"
+            activeColor: Color.accent
+            onPressed: function(buttonCode) {
+              if (buttonCode === Qt.LeftButton) {
+                root.panelView = "events"
+                root.refreshEvents()
+              }
+            }
+          }
+
+          WidgetButton {
+            bar: root.bar
             text: "LockIn"
             active: root.panelView === "lockin"
             activeColor: Color.accent
@@ -1140,6 +1203,101 @@ Panel {
               }
             }
           }
+        }
+
+        Flickable {
+          id: eventsFlick
+          width: parent.width
+          height: Math.min(eventsColumn.implicitHeight, root.listMaxHeight)
+          contentWidth: width
+          contentHeight: eventsColumn.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          flickableDirection: Flickable.VerticalFlick
+          visible: root.panelView === "events" && root.events.length > 0
+
+          Column {
+            id: eventsColumn
+            width: eventsFlick.width
+            spacing: Style.space(6)
+
+            Repeater {
+              model: root.events
+
+              delegate: Item {
+                required property var modelData
+                width: eventsColumn.width
+                height: eventRow.implicitHeight + Style.space(8)
+
+                Rectangle {
+                  anchors.fill: parent
+                  radius: Style.space(4)
+                  color: eventMouse.containsMouse
+                    ? Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+                    : "transparent"
+                }
+
+                MouseArea {
+                  id: eventMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openUrl(modelData.url)
+                }
+
+                Column {
+                  id: eventRow
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.margins: Style.space(8)
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(root.eventWhen(modelData.startsAt, modelData.isLive === true))
+                    color: modelData.isLive === true ? Color.urgent : root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    font.bold: modelData.isLive === true
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(root.snippet(modelData.title || "Event", 90))
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(String(modelData.url || "").replace(/^https?:\/\//, ""))
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideMiddle
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        Text {
+          width: parent.width
+          visible: root.panelView === "events" && root.configured && root.events.length === 0 && !root.viewBusy && root.errorText === ""
+          text: "No upcoming events."
+          color: root.mutedForeground
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.body
         }
 
         Text {
