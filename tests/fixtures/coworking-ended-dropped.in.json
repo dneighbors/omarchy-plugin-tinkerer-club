@@ -1,0 +1,12 @@
+{"path":"coworking.calendar","data":{"serverNow":"2026-11-21T19:00:00.000Z","matchedBySlot":{},"matchedCount":0,
+ "mySessions":[
+  {"id":"cw-over","title":"Over by the server clock","startsAt":"2026-11-21T17:00:00.000Z","endsAt":"2026-11-21T18:00:00.000Z"},
+  {"id":"cw-mine","title":"Mine","startsAt":"2026-11-22T09:00:00.000Z","endsAt":"2026-11-22T10:00:00.000Z"}
+ ],
+ "openSessions":[
+  {"id":"cw-cancelled","title":"Cancelled","status":"CANCELLED","startsAt":"2026-11-22T12:00:00.000Z","endsAt":"2026-11-22T13:00:00.000Z"},
+  {"id":"cw-started-no-end","title":"Started, no end","startsAt":"2026-11-21T18:00:00.000Z"},
+  {"id":"cw-stale-no-end","title":"Stale, no end","status":"ACTIVE","startsAt":"2026-11-20T18:00:00.000Z"},
+  {"id":"cw-mine","title":"Mine","startsAt":"2026-11-22T09:00:00.000Z","endsAt":"2026-11-22T10:00:00.000Z"},
+  {"id":"cw-next","title":"Next","startsAt":"2026-11-22T12:00:00.000Z","endsAt":"2026-11-22T13:00:00.000Z"}
+ ]}}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Layout check for the panel's tab row: six tabs (the four shipped plus two
-# test-only placeholders) at the default and the smallest panel width must all
+# Layout check for the panel's tab row: six tabs (the five shipped plus one
+# test-only placeholder) at the default and the smallest panel width must all
 # be inside the row, not overlap, keep a readable name, and mark one active.
 # Needs Quickshell and the Omarchy shell's QML; skips where they are missing
 # (the CI image has neither).
@@ -15,11 +15,11 @@ fail() {
   exit 1
 }
 
-# The shipped panel carries the four real views and no placeholders. This
+# The shipped panel carries the five real views and no placeholders. This
 # part needs no shell, so it runs everywhere.
 shipped=$(grep -o '{ view: "[a-z]*"' "$root/Panel.qml" | grep -o '"[a-z]*"' | tr -d '"' | paste -sd, -)
-[[ $shipped == feed,notifications,events,lockin ]] ||
-  fail "the shipped panel must have exactly the four real tabs, found: $shipped"
+[[ $shipped == feed,notifications,events,coworking,lockin ]] ||
+  fail "the shipped panel must have exactly the five real tabs, found: $shipped"
 
 if ! command -v quickshell >/dev/null 2>&1 || [[ ! -d $shell_dir/Ui || ! -d $shell_dir/Commons ]]; then
   printf 'tab-row.sh: layout check skipped (needs quickshell and %s)\n' "$shell_dir"

@@ -12,6 +12,7 @@ root=$(cd "$(dirname -- "$0")" && pwd)
 "$root/lockin-todos.sh"
 "$root/events-live.sh"
 "$root/events-upcoming.sh"
+"$root/coworking-calendar.sh"
 "$root/tab-row.sh"
 
-printf 'all tests passed: unread.sh list.sh mark.sh lockin-state.sh lockin-session.sh lockin-todos.sh events-live.sh events-upcoming.sh tab-row.sh\n'
+printf 'all tests passed: unread.sh list.sh mark.sh lockin-state.sh lockin-session.sh lockin-todos.sh events-live.sh events-upcoming.sh coworking-calendar.sh tab-row.sh\n'

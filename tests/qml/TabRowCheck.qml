@@ -3,8 +3,8 @@ import Quickshell
 import qs.Commons
 import "plugin" as Plugin
 
-// Lays the real tab row out with six tabs (the four shipped labels plus two
-// placeholders that exist only here) at the default and the smallest panel
+// Lays the real tab row out with six tabs (the five shipped labels plus one
+// placeholder that exists only here) at the default and the smallest panel
 // width, and prints one line per case for tests/tab-row.sh to assert on.
 ShellRoot {
   id: check
@@ -14,8 +14,8 @@ ShellRoot {
     { view: "feed", label: "Feed", name: "Feed: recent posts" },
     { view: "notifications", label: "Notifications", name: "Notifications: your unread and recent" },
     { view: "events", label: "Events", name: "Events: upcoming club events" },
+    { view: "coworking", label: "Coworking", name: "Coworking: your booked and the open sessions" },
     { view: "lockin", label: "LockIn", name: "LockIn: co-working session and checklist" },
-    { view: "coworking", label: "Coworking", name: "Coworking: placeholder" },
     { view: "jobs", label: "Jobs", name: "Jobs: placeholder" }
   ]
 
