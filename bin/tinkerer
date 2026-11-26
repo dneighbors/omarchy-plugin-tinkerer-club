@@ -937,6 +937,13 @@ unwrap_coworking() {
       | {
           ok: true,
           mine: $mine,
+          # The bar cue: the soonest session you booked that is in progress or
+          # starts within 15 minutes. A session with no known end stops cueing
+          # an hour after it started.
+          cue: ([$mine[]
+                 | stamp(.startsAt) as $s
+                 | select($s - $t <= 900 and (.endsAt != "" or $t - $s < 3600))]
+                | .[0] // null),
           # A session you booked is listed once, under yours.
           open: [sessions($open; $matched; $t)[] | select(. as $o | ($mine | map(.id + "|" + .startsAt) | index($o.id + "|" + $o.startsAt)) == null)]
         }

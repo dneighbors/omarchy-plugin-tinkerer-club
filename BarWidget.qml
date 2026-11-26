@@ -27,6 +27,11 @@ BarWidget {
   readonly property string liveTitle: panelItem && panelItem.liveTitle ? String(panelItem.liveTitle) : ""
   readonly property bool showLiveCue: liveNow && !opened
   readonly property bool showSessionCue: lockinLive && !opened && unreadCount <= 0
+  readonly property bool coworkingSoon: panelItem ? panelItem.coworkingSoon === true : false
+  readonly property string coworkingCueText: panelItem && panelItem.coworkingCueText ? String(panelItem.coworkingCueText) : ""
+  // Below the live dot, the unread badge and the LockIn countdown; above the
+  // new-activity dot.
+  readonly property bool showCoworkingCue: coworkingSoon && !opened && !liveNow && unreadCount <= 0 && !lockinLive
 
   property var panelItem: null
 
@@ -42,6 +47,10 @@ BarWidget {
   function open() { if (panelItem) panelItem.open() }
   function close() { if (panelItem) panelItem.close() }
   function togglePanel() { if (panelItem) panelItem.toggle() }
+  function press() {
+    if (showCoworkingCue && panelItem && panelItem.openCoworkingTab) panelItem.openCoworkingTab()
+    else togglePanel()
+  }
   function closeForPopoutSwitch() { if (panelItem) panelItem.closeForPopoutSwitch() }
 
   function injectPanel() {
@@ -119,7 +128,9 @@ BarWidget {
             ? ("Tinkerer Club · " + root.unreadCount + " unread")
             : (root.showSessionCue
                 ? ("Tinkerer Club · LockIn " + root.formatDuration(root.lockinRemainingMs) + " remaining")
-                : "Tinkerer Club"))
+                : (root.showCoworkingCue
+                    ? ("Tinkerer Club · Coworking: " + root.coworkingCueText)
+                    : "Tinkerer Club")))
 
     Rectangle {
       id: unreadBadge
@@ -184,8 +195,24 @@ BarWidget {
       anchors.topMargin: 1
     }
 
+    // Coworking cue: a ring, so it does not read as the new-activity dot.
     Rectangle {
-      visible: root.hasNew && !root.opened && root.unreadCount <= 0 && !root.lockinLive
+      id: coworkingCue
+      visible: root.showCoworkingCue
+      width: 8
+      height: 8
+      radius: 4
+      color: Color.background
+      border.color: Color.accent
+      border.width: 2
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.rightMargin: 1
+      anchors.bottomMargin: 1
+    }
+
+    Rectangle {
+      visible: root.hasNew && !root.opened && root.unreadCount <= 0 && !root.lockinLive && !root.showCoworkingCue
       width: 6
       height: 6
       radius: 3
@@ -197,7 +224,7 @@ BarWidget {
     }
 
     onPressed: function(buttonCode) {
-      if (buttonCode === Qt.LeftButton) root.togglePanel()
+      if (buttonCode === Qt.LeftButton) root.press()
     }
   }
 }
