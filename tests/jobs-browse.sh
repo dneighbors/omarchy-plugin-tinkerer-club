@@ -87,7 +87,7 @@ done
 export CURL_BODY="$root/tests/fixtures/jobs-empty.in.json"
 export CURL_CODE=200
 out=$(run_browse)
-if printf '%s' "$out" | jq -e '. == {ok: true, total: 0, jobs: []}' >/dev/null 2>&1; then
+if printf '%s' "$out" | jq -e '. == {ok: true, total: 0, newCount: 0, seenAt: "", jobs: []}' >/dev/null 2>&1; then
   pass "empty board"
 else
   bad "empty board"; printf '  out=%s\n' "$out"
@@ -158,7 +158,7 @@ panel="$root/Panel.qml"
 grep -q 'id: jobsProc' "$panel" && pass "Panel jobsProc" || bad "Panel jobsProc"
 grep -q '"jobs", "browse"' "$panel" && pass "Panel cmd jobs browse" || bad "Panel cmd jobs browse"
 grep -q 'function applyJobs' "$panel" && pass "Panel applyJobs" || bad "Panel applyJobs"
-grep -q 'label: "Jobs"' "$panel" && pass "Panel Jobs tab" || bad "Panel Jobs tab"
+grep -q ': "Jobs",$' "$panel" && pass "Panel Jobs tab" || bad "Panel Jobs tab"
 grep -q 'id: jobsFlick' "$panel" && pass "Panel jobs list" || bad "Panel jobs list"
 grep -q 'root.plain(root.snippet(modelData.title || "Job post", 90))' "$panel" && pass "Panel job title" || bad "Panel job title"
 grep -q 'root.plain(root.jobDetail(modelData))' "$panel" && pass "Panel job company and workplace" || bad "Panel job company and workplace"

@@ -1,6 +1,8 @@
 {
   "ok": true,
   "total": 3,
+  "newCount": 0,
+  "seenAt": "2026-11-05T10:00:00Z",
   "jobs": [
     {
       "id": "alt-keys",
@@ -11,7 +13,8 @@
       "location": "Berlin, Germany",
       "employmentType": "Full time",
       "postedAt": "2026-11-05T10:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "bad-date",
@@ -22,7 +25,8 @@
       "location": "",
       "employmentType": "Contract",
       "postedAt": "sometime last week",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "bare",
@@ -33,7 +37,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     }
   ]
 }

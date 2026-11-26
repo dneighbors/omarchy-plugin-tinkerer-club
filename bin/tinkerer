@@ -37,7 +37,8 @@ Commands:
   events live           Current or next live broadcast as JSON.
   events upcoming       Upcoming events (next 62 days) as JSON.
   coworking calendar    Your booked and the open coworking sessions (next 15 days) as JSON.
-  jobs browse           Open hiring posts on the jobs board, newest first, as JSON.
+  jobs browse [--since STAMP]  Open hiring posts on the jobs board, newest first, as JSON.
+                         With --since, posts newer than STAMP are marked isNew.
 EOF
 }
 
@@ -969,7 +970,8 @@ cmd_coworking_calendar() {
 }
 
 unwrap_jobs() {
-  jq -c --arg origin "$(validate_base_url "$base_url")" --argjson limit "$1" '
+  jq -c --arg origin "$(validate_base_url "$base_url")" --argjson limit "$1" \
+    --arg has_since "$2" --arg since "$3" '
     if type == "object" and .ok == false then .
     else
       def unwrap:
@@ -1055,21 +1057,40 @@ unwrap_jobs() {
             }
         ]
       | unique_by(.id)
-      | sort_by(-._s)
-      | map(del(._s)) as $jobs
+      | sort_by(-._s) as $all
+      # What the member last saw: null with no --since (nothing is new then),
+      # 0 when they saw a board with no dated post.
+      | (if $has_since == "1" then (stamp($since) // 0) else null end) as $seen
+      | [$all[0:$limit][] | . + {isNew: ($seen != null and ._s > $seen)}] as $jobs
+      | ($all[0]._s // 0) as $top
       | {
           ok: true,
           # The board total when the API gives one; never less than what is listed.
           total: ([(if ($p | type) == "object" and ($p.total | type) == "number" then ($p.total | floor) else 0 end),
-                   ($jobs | length)] | max),
-          jobs: $jobs[0:$limit]
+                   ($all | length)] | max),
+          newCount: ([$jobs[] | select(.isNew)] | length),
+          # What to pass as --since next time: the newest post date seen so
+          # far. It never moves back when the newest post leaves the board.
+          seenAt: (if $top > ($seen // 0) then $all[0].postedAt else $since end),
+          jobs: ($jobs | map(del(._s)))
         }
     end
   '
 }
 
 cmd_jobs_browse() {
-  local n="$feed_limit" payload
+  local n="$feed_limit" payload has_since=0 since=""
+  while (($# > 0)); do
+    case "$1" in
+      --since)
+        has_since=1
+        since="${2:-}"
+        shift
+        (($# > 0)) && shift
+        ;;
+      *) fail "Unknown option: $1" "Use: jobs browse [--since STAMP]" ;;
+    esac
+  done
   if (( n < 1 )); then
     n=1
   elif (( n > 50 )); then
@@ -1078,7 +1099,7 @@ cmd_jobs_browse() {
   # jobs.browse answers HTTP 400 without kind, sort and direction. HIRING is
   # the hiring board; the other kind, SEEKING, is members looking for work.
   payload="$(api_call "jobs/browse" '{"kind":"HIRING","query":"","skill":"","sort":"NEWEST","direction":"forward"}')"
-  printf '%s' "$payload" | unwrap_jobs "$n"
+  printf '%s' "$payload" | unwrap_jobs "$n" "$has_since" "$since"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -1171,7 +1192,10 @@ case "$command" in
     ;;
   jobs)
     case "${2:-}" in
-      browse) cmd_jobs_browse ;;
+      browse)
+        shift 2
+        cmd_jobs_browse "$@"
+        ;;
       "") fail "Unknown command: jobs" ;;
       *) fail "Unknown command: $2" ;;
     esac
