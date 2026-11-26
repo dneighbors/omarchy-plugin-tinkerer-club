@@ -90,6 +90,9 @@ Panel {
   // memory, for as long as the shell runs. jobsSeenKnown stays false until
   // the tab has loaded once, so nothing is new the first time.
   property bool jobsSeenKnown: false
+  // The tab was opened, whether or not that load was still showing when it
+  // finished: the first list to arrive after it is the one to remember.
+  property bool jobsOpened: false
   property string jobsSeenAt: ""
   property int jobsNewCount: 0
   // One list for the Coworking tab: a heading row, then that group's sessions.
@@ -422,6 +425,7 @@ Panel {
   }
 
   function refreshJobs() {
+    if (root.opened && root.panelView === "jobs") root.jobsOpened = true
     if (!jobsProc.running) {
       jobsProc.command = root.cmd(["jobs", "browse"].concat(root.jobsSeenKnown ? ["--since", root.jobsSeenAt] : []))
       jobsProc.running = true
@@ -436,9 +440,11 @@ Panel {
   function applyJobs(data) {
     if (data && data.ok === true && Array.isArray(data.jobs)) {
       root.jobs = data.jobs
-      if (root.opened && root.panelView === "jobs") {
+      if ((root.opened && root.panelView === "jobs") || (root.jobsOpened && !root.jobsSeenKnown)) {
         // Seen: the tab mark clears and the marker moves up. The rows keep
-        // their "New" for this viewing; the next load drops it.
+        // their "New" for this viewing; the next load drops it. A first
+        // load that finishes after the member left the tab still sets the
+        // marker, so later posts can be marked.
         root.jobsSeenAt = String(data.seenAt || "")
         root.jobsSeenKnown = true
         root.jobsNewCount = 0
@@ -1079,8 +1085,9 @@ Panel {
         root.refreshLive()
       if (root.configured)
         root.refreshCoworking()
-      // Nothing can be new before the Jobs tab has been opened once.
-      if (root.configured && root.jobsSeenKnown)
+      // Nothing can be new before the Jobs tab has been opened once. Opened
+      // but not loaded yet (left early, or an error): keep trying.
+      if (root.configured && (root.jobsSeenKnown || root.jobsOpened))
         root.refreshJobs()
     }
   }

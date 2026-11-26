@@ -126,9 +126,13 @@ if awk '/^  function applyJobs/ {t=1} t && /root.opened && root.panelView === "j
 else
   bad "Panel clears the mark once the Jobs tab has loaded"
 fi
+# Opened, then left (or closed) before the first load finished: that load
+# still sets the marker, and the quiet refresh retries until one does.
+grep -q 'if (root.opened && root.panelView === "jobs") root.jobsOpened = true' "$panel" && pass "Panel remembers the Jobs tab was opened" || bad "Panel remembers the Jobs tab was opened"
+grep -q '(root.opened && root.panelView === "jobs") || (root.jobsOpened && !root.jobsSeenKnown)' "$panel" && pass "Panel sets the marker on a first load that finishes off the tab" || bad "Panel sets the marker on a first load that finishes off the tab"
 [ "$(grep -c 'jobsNewCount = 0' "$panel")" -ge 3 ] && pass "Panel clears the mark on error and without a key" || bad "Panel clears the mark on error and without a key"
 # The quiet refresh timer (the one keyed on refreshMinutes) reads the jobs.
-if awk '/interval: Math.max\(1, root.refreshMinutes\)/ {t=1} t && /root.jobsSeenKnown\)/ {k=1} t && k && /root.refreshJobs\(\)/ {found=1} t && /^  }/ {t=0} END {exit !found}' "$panel"; then
+if awk '/interval: Math.max\(1, root.refreshMinutes\)/ {t=1} t && /root.jobsSeenKnown \|\| root.jobsOpened\)/ {k=1} t && k && /root.refreshJobs\(\)/ {found=1} t && /^  }/ {t=0} END {exit !found}' "$panel"; then
   pass "Panel quiet refresh reads jobs"
 else
   bad "Panel quiet refresh reads jobs"
