@@ -1,0 +1,17 @@
+{
+  "data": {
+    "items": [
+      {"id": "j-js", "title": "Script link", "url": "javascript:alert(1)", "createdAt": "2026-11-20T06:00:00Z"},
+      {"id": "j-off", "title": "Off origin", "url": "https://evil.example/jobs/1", "createdAt": "2026-11-20T05:00:00Z"},
+      {"id": "j-lookalike", "title": "Lookalike origin", "href": "https://jobs.test.invalid.evil.example/x", "createdAt": "2026-11-20T04:00:00Z"},
+      {"id": "j-file", "title": "File link", "link": "file:///etc/passwd", "createdAt": "2026-11-20T03:00:00Z"},
+      {"id": "j-slash", "title": "Backslash", "url": "/\\evil.example", "createdAt": "2026-11-20T02:00:00Z"},
+      {"id": "j-proto", "title": "Protocol relative", "url": "//evil.example/jobs", "createdAt": "2026-11-20T01:30:00Z"},
+      {"id": "j-rel", "title": "Relative path", "url": "/jobs/j-rel", "createdAt": "2026-11-20T01:00:00Z"},
+      {"id": "j-own", "title": "Own origin", "webUrl": "https://jobs.test.invalid/jobs/j-own", "createdAt": "2026-11-20T00:30:00Z"},
+      {"id": "j-apply", "title": "Apply link is not the job link", "applyUrl": "https://evil.example/apply", "companyUrl": "https://evil.example", "createdAt": "2026-11-20T00:00:00Z"}
+    ],
+    "total": 9
+  },
+  "path": "jobs.browse"
+}

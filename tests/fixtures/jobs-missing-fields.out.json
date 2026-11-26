@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "total": 3,
+  "jobs": [
+    {
+      "id": "alt-keys",
+      "title": "Backend Developer",
+      "company": "Object Co",
+      "poster": "Plain Name",
+      "workplace": "Remote (EU only)",
+      "location": "Berlin, Germany",
+      "employmentType": "Full time",
+      "postedAt": "2026-11-05T10:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "bad-date",
+      "title": "Odd date",
+      "company": "Flat Co",
+      "poster": "",
+      "workplace": "Remote",
+      "location": "",
+      "employmentType": "Contract",
+      "postedAt": "sometime last week",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "bare",
+      "title": "Job post",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "",
+      "url": "https://jobs.test.invalid/jobs"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "result": {
+    "data": {
+      "jobs": [
+        "not an object",
+        null,
+        {"title": "No id, skipped", "createdAt": "2026-11-20T00:00:00Z"},
+        {"id": "", "title": "Empty id, skipped"},
+        {"id": "bare"},
+        {
+          "jobId": "alt-keys",
+          "role": "Backend Developer",
+          "company": {"name": "Object Co"},
+          "poster": "Plain Name",
+          "workplace": "Remote (EU only)",
+          "location": "Berlin, Germany",
+          "employmentType": "FULL_TIME",
+          "postedAt": "2026-11-05T10:00:00Z"
+        },
+        {
+          "id": "bad-date",
+          "title": "Odd date",
+          "companyName": "Flat Co",
+          "workplaces": ["REMOTE", "REMOTE", 7, null],
+          "employmentTypes": "CONTRACT",
+          "createdAt": "sometime last week"
+        }
+      ]
+    }
+  }
+}
