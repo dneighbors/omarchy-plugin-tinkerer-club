@@ -1,6 +1,8 @@
 {
   "ok": true,
   "total": 9,
+  "newCount": 0,
+  "seenAt": "2026-11-20T06:00:00Z",
   "jobs": [
     {
       "id": "j-js",
@@ -11,7 +13,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T06:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "j-off",
@@ -22,7 +25,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T05:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "j-lookalike",
@@ -33,7 +37,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T04:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "j-file",
@@ -44,7 +49,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T03:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "j-slash",
@@ -55,7 +61,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T02:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "j-proto",
@@ -66,7 +73,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T01:30:00Z",
-      "url": "https://jobs.test.invalid/evil.example/jobs"
+      "url": "https://jobs.test.invalid/evil.example/jobs",
+      "isNew": false
     },
     {
       "id": "j-rel",
@@ -77,7 +85,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T01:00:00Z",
-      "url": "https://jobs.test.invalid/jobs/j-rel"
+      "url": "https://jobs.test.invalid/jobs/j-rel",
+      "isNew": false
     },
     {
       "id": "j-own",
@@ -88,7 +97,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T00:30:00Z",
-      "url": "https://jobs.test.invalid/jobs/j-own"
+      "url": "https://jobs.test.invalid/jobs/j-own",
+      "isNew": false
     },
     {
       "id": "j-apply",
@@ -99,7 +109,8 @@
       "location": "",
       "employmentType": "",
       "postedAt": "2026-11-20T00:00:00Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     }
   ]
 }

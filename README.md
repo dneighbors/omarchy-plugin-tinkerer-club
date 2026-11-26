@@ -52,6 +52,8 @@ When several of these apply, the tooltip and the marks on the lobster follow thi
 4. A coworking session of yours that is close or in progress: the ring.
 5. New activity: the dot.
 
+When jobs were posted since you last opened the Jobs tab, its label shows how many ("Jobs · 2") and those rows read "New"; the plugin looks on the quiet refresh, the count clears once the tab has loaded, and nothing is marked the first time you open the tab after the shell starts. The bar shows nothing for jobs.
+
 ```sh
 omarchy bar move dneighbors.tinkerer-club --section right
 ```

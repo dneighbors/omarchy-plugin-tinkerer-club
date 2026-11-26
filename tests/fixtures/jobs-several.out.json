@@ -1,6 +1,8 @@
 {
   "ok": true,
   "total": 4,
+  "newCount": 0,
+  "seenAt": "2026-11-20T12:30:00.000Z",
   "jobs": [
     {
       "id": "job-new",
@@ -11,7 +13,8 @@
       "location": "Lisbon, Portugal",
       "employmentType": "Freelance, Contract",
       "postedAt": "2026-11-20T12:30:00.000Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "job-mid",
@@ -22,7 +25,8 @@
       "location": "",
       "employmentType": "Part time",
       "postedAt": "2026-11-10T09:15:00+02:00",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     },
     {
       "id": "job-old",
@@ -33,7 +37,8 @@
       "location": "Austin, United States",
       "employmentType": "Full time",
       "postedAt": "2026-11-01T08:00:00.000Z",
-      "url": "https://jobs.test.invalid/jobs"
+      "url": "https://jobs.test.invalid/jobs",
+      "isNew": false
     }
   ]
 }

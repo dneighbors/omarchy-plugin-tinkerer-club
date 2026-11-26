@@ -86,6 +86,12 @@ Panel {
   property var jobs: []
   property string jobsErrorText: ""
   property string jobsStatusHint: ""
+  // What the Jobs tab last showed, kept the way the feed keeps seenId: in
+  // memory, for as long as the shell runs. jobsSeenKnown stays false until
+  // the tab has loaded once, so nothing is new the first time.
+  property bool jobsSeenKnown: false
+  property string jobsSeenAt: ""
+  property int jobsNewCount: 0
   // One list for the Coworking tab: a heading row, then that group's sessions.
   readonly property var coworkingRows: {
     var rows = []
@@ -97,7 +103,7 @@ Panel {
   }
   // Drop a previously fetched live event once the key goes away, since
   // refreshLive() stops running while unconfigured.
-  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = []; coworkingCue = null; jobs = [] }
+  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = []; coworkingCue = null; jobs = []; jobsNewCount = 0 }
   readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
   readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
@@ -128,7 +134,8 @@ Panel {
     { view: "notifications", label: "Notifications", name: "Notifications: your unread and recent" },
     { view: "events", label: "Events", name: "Events: upcoming club events" },
     { view: "coworking", label: "Coworking", name: "Coworking: your booked and the open sessions" },
-    { view: "jobs", label: "Jobs", name: "Jobs: open hiring posts" },
+    { view: "jobs", label: root.jobsNewCount > 0 ? "Jobs \u00b7 " + root.jobsNewCount : "Jobs",
+      name: "Jobs: open hiring posts" + (root.jobsNewCount > 0 ? ", " + root.jobsNewCount + " new" : "") },
     { view: "lockin", label: "LockIn", name: "LockIn: co-working session and checklist" }
   ]
 
@@ -416,17 +423,34 @@ Panel {
 
   function refreshJobs() {
     if (!jobsProc.running) {
-      jobsProc.command = root.cmd(["jobs", "browse"])
+      jobsProc.command = root.cmd(["jobs", "browse"].concat(root.jobsSeenKnown ? ["--since", root.jobsSeenAt] : []))
       jobsProc.running = true
     }
+  }
+
+  function clearJobMarks() {
+    if (root.jobs.some(function(job) { return job && job.isNew === true }))
+      root.jobs = root.jobs.map(function(job) { return Object.assign({}, job, { isNew: false }) })
   }
 
   function applyJobs(data) {
     if (data && data.ok === true && Array.isArray(data.jobs)) {
       root.jobs = data.jobs
+      if (root.opened && root.panelView === "jobs") {
+        // Seen: the tab mark clears and the marker moves up. The rows keep
+        // their "New" for this viewing; the next load drops it.
+        root.jobsSeenAt = String(data.seenAt || "")
+        root.jobsSeenKnown = true
+        root.jobsNewCount = 0
+      } else {
+        var n = Number(data.newCount)
+        root.jobsNewCount = root.jobsSeenKnown && isFinite(n) && n > 0 ? Math.floor(n) : 0
+      }
       jobsErrorText = ""
       jobsStatusHint = ""
     } else {
+      root.jobsNewCount = 0
+      root.clearJobMarks()
       jobsErrorText = (data && data.error) || "Could not load jobs."
       jobsStatusHint = (data && data.hint) || ""
     }
@@ -813,7 +837,11 @@ Panel {
     }
   }
 
-  onPanelViewChanged: root.syncViewMessages()
+  onPanelViewChanged: {
+    root.syncViewMessages()
+    // Rows already seen in the Jobs tab are not new the next time.
+    if (root.panelView !== "jobs" && root.jobsNewCount === 0) root.clearJobMarks()
+  }
 
   onOpenedChanged: {
     if (opened) {
@@ -1051,6 +1079,9 @@ Panel {
         root.refreshLive()
       if (root.configured)
         root.refreshCoworking()
+      // Nothing can be new before the Jobs tab has been opened once.
+      if (root.configured && root.jobsSeenKnown)
+        root.refreshJobs()
     }
   }
 
@@ -1644,6 +1675,7 @@ Panel {
                 required property var modelData
                 readonly property string detail: root.plain(root.jobDetail(modelData))
                 readonly property string age: root.plain(root.relativeTime(modelData.postedAt))
+                readonly property bool isNew: modelData.isNew === true
                 width: jobsColumn.width
                 height: jobRow.implicitHeight + Style.space(8)
 
@@ -1696,10 +1728,10 @@ Panel {
 
                   Text {
                     width: parent.width
-                    visible: jobItem.age !== ""
+                    visible: jobItem.age !== "" || jobItem.isNew
                     textFormat: Text.PlainText
-                    text: root.plain(root.relativeTime(modelData.postedAt))
-                    color: root.mutedForeground
+                    text: root.plain([jobItem.isNew ? "New" : "", jobItem.age].filter(function(part) { return part }).join(" \u00b7 "))
+                    color: jobItem.isNew ? Color.accent : root.mutedForeground
                     font.family: root.contentFontFamily
                     font.pixelSize: Style.font.caption
                     elide: Text.ElideRight
