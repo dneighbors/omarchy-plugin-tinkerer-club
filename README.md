@@ -22,11 +22,25 @@ Do not add `Bearer`. The helper sends the raw key as `x-api-key`.
 
 Issue a key from Tinkerer Club. The Raycast extension uses the same key and the same default origin, `https://app.tinkerer.club`.
 
+## Update
+
+```sh
+omarchy plugin update dneighbors.tinkerer-club
+```
+
+The panel loads its new version as soon as the update finishes; no restart is needed for panel changes. The shell keeps the bar widget itself (the lobster, its dot, and its badges) in memory, so restart the shell when a release changes those, or if the panel still looks old:
+
+```sh
+omarchy restart shell
+```
+
+Do that once after the first update that brings this in, too: the widget already running is the old one, and turning the plugin off and on does not replace it.
+
 ## Usage
 
 Click the lobster in the bar to open or close the panel. Escape closes it.
 
-The panel has Feed, Notifications, Events, and LockIn. Events lists what is coming up in the next 62 days (the longest window the club calendar allows): each row shows the local start time, the title, and the event link, and clicking a row opens it. An event already under way reads "Live now"; ended and canceled events are left out. When a club broadcast is live, a LIVE banner sits at the top of the panel; click it to open the event. If the next broadcast is only scheduled, the banner shows its title and start time instead. While the panel is closed, a red dot on the bar and a "Live now" tooltip tell you a session is already going. Click a post or a notification with a target URL to open it in the browser. Refresh updates whichever view is showing. On Notifications, Mark read and Mark all read are explicit; the unread badge updates after those succeed. LockIn shows your live co-working session, who else is locked in, and a skew-safe countdown toward the 60-minute cap. Start a session with an optional title or finish anytime; finishing before 30 minutes is allowed but does not earn Sparkles (the reward window is 30–60 minutes). At 30 seconds before the cap, the plugin auto-finishes and restarts with the same title. The LockIn tab also lists your private checklist: add items, toggle complete, or delete; it works with or without a live session and stays in sync with the web LockIn page. When the panel is closed during a LockIn session, the bar can show remaining time; the unread badge still wins if both apply. The bar shows a dot when something newer than your last open arrives. When the panel is closed and there are unread notifications, a count badge replaces that dot. The dot comes back when the count is 0.
+The panel has Feed, Notifications, Events, and LockIn. The tabs wrap onto a second line when they do not fit the panel width, and hovering a tab shows its full name. Events lists what is coming up in the next 62 days (the longest window the club calendar allows): each row shows the local start time, the title, and the event link, and clicking a row opens it. An event already under way reads "Live now"; ended and canceled events are left out. When a club broadcast is live, a LIVE banner sits at the top of the panel; click it to open the event. If the next broadcast is only scheduled, the banner shows its title and start time instead. While the panel is closed, a red dot on the bar and a "Live now" tooltip tell you a session is already going. Click a post or a notification with a target URL to open it in the browser. Refresh updates whichever view is showing. On Notifications, Mark read and Mark all read are explicit; the unread badge updates after those succeed. LockIn shows your live co-working session, who else is locked in, and a skew-safe countdown toward the 60-minute cap. Start a session with an optional title or finish anytime; finishing before 30 minutes is allowed but does not earn Sparkles (the reward window is 30–60 minutes). At 30 seconds before the cap, the plugin auto-finishes and restarts with the same title. The LockIn tab also lists your private checklist: add items, toggle complete, or delete; it works with or without a live session and stays in sync with the web LockIn page. When the panel is closed during a LockIn session, the bar can show remaining time; the unread badge still wins if both apply. The bar shows a dot when something newer than your last open arrives. When the panel is closed and there are unread notifications, a count badge replaces that dot. The dot comes back when the count is 0.
 
 ```sh
 omarchy bar move dneighbors.tinkerer-club --section right

@@ -93,6 +93,68 @@ Panel {
       : feedProc.running)
   readonly property bool busy: liveProc.running || eventsProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
 
+  // One entry per view: `label` is what the tab shows, `name` is the longer
+  // name read by screen readers and shown in the tooltip.
+  readonly property var tabs: [
+    { view: "feed", label: "Feed", name: "Feed: recent posts" },
+    { view: "notifications", label: "Notifications", name: "Notifications: your unread and recent" },
+    { view: "events", label: "Events", name: "Events: upcoming club events" },
+    { view: "lockin", label: "LockIn", name: "LockIn: co-working session and checklist" }
+  ]
+
+  function selectView(view) {
+    root.panelView = view
+    if (view === "notifications") {
+      root.refreshNotifications()
+    } else if (view === "events") {
+      root.refreshEvents()
+    } else if (view === "lockin") {
+      root.refreshLockinState()
+      root.refreshLockinTodos()
+    }
+  }
+
+  // The tab row wraps onto another line when the tabs outgrow the panel, so
+  // every view stays reachable at any panel width and labels stay whole.
+  component TabRow: Flow {
+    id: tabRow
+
+    property var bar: null
+    property var tabs: []
+    property string current: ""
+
+    signal selected(string view)
+
+    spacing: Style.space(8)
+    Accessible.role: Accessible.PageTabList
+    Accessible.name: "Views"
+
+    Repeater {
+      model: tabRow.tabs
+
+      WidgetButton {
+        id: tab
+
+        required property var modelData
+        readonly property string view: String(modelData.view || "")
+        readonly property string name:
+          String(modelData.name || modelData.label || "").replace(/[<>]/g, "")
+
+        bar: tabRow.bar
+        text: String(modelData.label || "").replace(/[<>]/g, "")
+        tooltipText: tab.name
+        active: tabRow.current === tab.view
+        activeColor: Color.accent
+        Accessible.role: Accessible.PageTab
+        Accessible.name: tab.name
+        Accessible.selected: tab.active
+        onPressed: function(buttonCode) {
+          if (buttonCode === Qt.LeftButton) tabRow.selected(tab.view)
+        }
+      }
+    }
+  }
+
   function syncViewMessages() {
     if (root.panelView === "notifications") {
       errorText = notificationsErrorText
@@ -917,62 +979,12 @@ Panel {
           }
         }
 
-        RowLayout {
+        TabRow {
           width: parent.width
-          spacing: Style.space(8)
-
-          WidgetButton {
-            bar: root.bar
-            text: "Feed"
-            active: root.panelView === "feed"
-            activeColor: Color.accent
-            onPressed: function(buttonCode) {
-              if (buttonCode === Qt.LeftButton)
-                root.panelView = "feed"
-            }
-          }
-
-          WidgetButton {
-            bar: root.bar
-            text: "Notifications"
-            active: root.panelView === "notifications"
-            activeColor: Color.accent
-            onPressed: function(buttonCode) {
-              if (buttonCode === Qt.LeftButton) {
-                root.panelView = "notifications"
-                root.refreshNotifications()
-              }
-            }
-          }
-
-          WidgetButton {
-            bar: root.bar
-            text: "Events"
-            active: root.panelView === "events"
-            activeColor: Color.accent
-            onPressed: function(buttonCode) {
-              if (buttonCode === Qt.LeftButton) {
-                root.panelView = "events"
-                root.refreshEvents()
-              }
-            }
-          }
-
-          WidgetButton {
-            bar: root.bar
-            text: "LockIn"
-            active: root.panelView === "lockin"
-            activeColor: Color.accent
-            onPressed: function(buttonCode) {
-              if (buttonCode === Qt.LeftButton) {
-                root.panelView = "lockin"
-                root.refreshLockinState()
-                root.refreshLockinTodos()
-              }
-            }
-          }
-
-          Item { Layout.fillWidth: true }
+          bar: root.bar
+          tabs: root.tabs
+          current: root.panelView
+          onSelected: function(view) { root.selectView(view) }
         }
 
         RowLayout {

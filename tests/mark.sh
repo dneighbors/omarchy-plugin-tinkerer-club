@@ -607,8 +607,10 @@ p = pathlib.Path(sys.argv[1]).read_text()
 opened = p[p.find("onOpenedChanged"):p.find("Process {")]
 rn = p.find("function refreshNotifications")
 refresh_n = p[rn:p.find("function refresh()", rn)] if rn != -1 else ""
-sw = p.find('text: "Notifications"')
-switcher = p[sw:p.find("Item {", sw)] if sw != -1 else ""
+sw = p.find("function selectView")
+if sw == -1:
+    sys.exit(1)
+switcher = p[sw:p.find("function syncViewMessages", sw)]
 an = p.find("function applyNotifications")
 apply_n = p[an:p.find("onOpenedChanged")] if an != -1 else ""
 banned = (
