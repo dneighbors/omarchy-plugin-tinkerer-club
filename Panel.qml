@@ -71,6 +71,16 @@ Panel {
   property string eventsStatusHint: ""
   property var coworkingMine: []
   property var coworkingOpen: []
+  // The session of yours that is in progress or about to start, or null.
+  property var coworkingCue: null
+  readonly property bool coworkingSoon: coworkingCue !== null
+  readonly property string coworkingCueText: {
+    if (coworkingCue === null) return ""
+    var stamp = Date.parse(coworkingCue.startsAt)
+    var at = isFinite(stamp) ? Qt.formatDateTime(new Date(stamp), "h:mm AP") : ""
+    var when = at === "" ? "" : (coworkingCue.isLive === true ? " \u00b7 started " : " \u00b7 starts ") + at
+    return root.plain(root.snippet(coworkingCue.title || "Coworking session", 60) + when)
+  }
   property string coworkingErrorText: ""
   property string coworkingStatusHint: ""
   // One list for the Coworking tab: a heading row, then that group's sessions.
@@ -84,7 +94,7 @@ Panel {
   }
   // Drop a previously fetched live event once the key goes away, since
   // refreshLive() stops running while unconfigured.
-  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = [] }
+  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = []; coworkingCue = null }
   readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
   readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
@@ -341,9 +351,12 @@ Panel {
     if (data && data.ok === true && Array.isArray(data.mine) && Array.isArray(data.open)) {
       root.coworkingMine = data.mine
       root.coworkingOpen = data.open
+      root.coworkingCue = data.cue && data.cue.id ? data.cue : null
       coworkingErrorText = ""
       coworkingStatusHint = ""
     } else {
+      // No answer, no cue: the bar never shows a stale or failed state.
+      root.coworkingCue = null
       coworkingErrorText = (data && data.error) || "Could not load coworking sessions."
       coworkingStatusHint = (data && data.hint) || ""
     }
@@ -351,6 +364,13 @@ Panel {
       errorText = coworkingErrorText
       statusHint = coworkingStatusHint
     }
+  }
+
+  // Opens the panel straight on the Coworking tab (the bar cue's click).
+  function openCoworkingTab() {
+    root.panelView = "coworking"
+    if (root.opened) root.refreshCoworking()
+    else root.open()
   }
 
   function coworkingPageUrl() {
@@ -750,6 +770,7 @@ Panel {
         root.applyStatus(data)
         if (root.configured && root.opened) root.refreshFeed()
         if (root.configured) root.refreshLive()
+        if (root.configured) root.refreshCoworking()
       }
     }
   }
@@ -952,6 +973,8 @@ Panel {
         root.refreshLockinState()
       if (root.configured)
         root.refreshLive()
+      if (root.configured)
+        root.refreshCoworking()
     }
   }
 

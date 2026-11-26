@@ -1,0 +1,7 @@
+{"path":"coworking.calendar","data":{"matchedBySlot":{},"matchedCount":0,
+ "mySessions":[
+  {"id":"cw-mine","title":"Deep <b>work</b>","startsAt":"2026-11-23T19:10:00.000Z","endsAt":"2026-11-23T20:10:00.000Z","url":"/coworking/cw-mine"}
+ ],
+ "openSessions":[
+  {"id":"cw-open","title":"Not mine","startsAt":"2026-11-23T17:00:00.000Z","endsAt":"2026-11-23T23:00:00.000Z"}
+ ]}}
