@@ -780,7 +780,10 @@ unwrap_calendar() {
               | (if $bf != null and $bs != null and $s != null then $s + ($bf - $bs) else $bf end) as $f
               | (if $starts == $base_starts or $f == null then $base_ends else ($f | todateiso8601) end) as $ends
               | select($s != null)
-              | select(if $f != null then $f > $t else $s >= $t end)
+              # With no end and no duration the session cannot be shown to be over:
+          # once started it stays listed as live, for a day at most so a stale
+          # row cannot linger.
+          | select(if $f != null then $f > $t else $s > $t - 86400 end)
               | {
                   id: $id,
                   title: (text($e; ["title","name"]) | if . == "" then "Event" else . end),
@@ -886,7 +889,10 @@ unwrap_coworking() {
           | ([$e.durationMinutes, $e.duration, $slot.durationMinutes] | map(select(type == "number" and . > 0)) | .[0] // null) as $minutes
           | (stamp($base_ends) // (if $minutes != null then $s + $minutes * 60 else null end)) as $f
           | (if $base_ends != "" then $base_ends elif $f != null then ($f | todateiso8601) else "" end) as $ends
-          | select(if $f != null then $f > $t else $s >= $t end)
+          # With no end and no duration the session cannot be shown to be over:
+          # once started it stays listed as live, for a day at most so a stale
+          # row cannot linger.
+          | select(if $f != null then $f > $t else $s > $t - 86400 end)
           | ([$e.host, $e.owner, $e.creator, $e.createdBy, $e.organizer] | map(person(.) | select(. != "")) | .[0]
              // text($e; ["hostName","ownerName","creatorName"])) as $host
           | ([
