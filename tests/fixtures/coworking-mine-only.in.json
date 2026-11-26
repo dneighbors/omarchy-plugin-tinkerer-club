@@ -1,0 +1,9 @@
+{"path":"coworking.calendar","data":{"serverNow":"2026-11-21T19:00:00.000Z","matchedCount":1,
+ "matchedBySlot":{"cw-later":{"user":{"name":"Robin"}}},
+ "openSessions":[],
+ "mySessions":[
+  {"id":"cw-later","title":"Deep work","startsAt":"2026-11-24T15:00:00.000Z","endsAt":"2026-11-24T16:00:00.000Z","host":{"name":"Ada"},"url":"/coworking/cw-later"},
+  {"id":"cw-now","startsAt":"2026-11-21T18:30:00.000Z","durationMinutes":60,"hostName":"Ada","participants":[{"user":{"name":"Ada"}},{"name":"Sam <b>"},"Lee",{"name":"Lee"}]},
+  {"title":"No id, skipped","startsAt":"2026-11-25T15:00:00.000Z"},
+  {"id":"cw-bad-time","startsAt":"soon"}
+ ]}}

@@ -36,6 +36,7 @@ Commands:
   lockin todo-delete ID Delete a LockIn todo.
   events live           Current or next live broadcast as JSON.
   events upcoming       Upcoming events (next 62 days) as JSON.
+  coworking calendar    Your booked and the open coworking sessions (next 15 days) as JSON.
 EOF
 }
 
@@ -821,6 +822,138 @@ cmd_events_upcoming() {
   printf '%s' "$payload" | unwrap_calendar "$n"
 }
 
+unwrap_coworking() {
+  jq -c --arg origin "$(validate_base_url "$base_url")" --arg now "${TINKERER_NOW:-}" --argjson limit "$1" '
+    if type == "object" and .ok == false then .
+    else
+      def unwrap:
+        if type == "object" then
+          if has("result") then .result | unwrap
+          elif has("data") then .data | unwrap
+          elif has("json") then .json | unwrap
+          else . end
+        else . end;
+      def text($obj; $keys):
+        if ($obj | type) != "object" then ""
+        else ($keys | map($obj[.] | select(type == "string" and . != ""))) | .[0] // "" end;
+      def stamp($value):
+        if ($value | type) != "string" or $value == "" then null
+        else ($value | sub("\\.[0-9]+"; "") | sub("(?<z>[+-][0-9]{2}):?[0-9]{2}$"; "Z") | try fromdateiso8601 catch null)
+        end;
+      # Only links on the configured origin survive; anything else falls back
+      # to the coworking page.
+      def resolve($value):
+        if ($value | type) != "string" or $value == "" then empty
+        elif ($value | test("^https?://"; "i")) then
+          (if $value == $origin or ($value | startswith($origin + "/")) then $value else empty end)
+        elif ($value | test("^[a-zA-Z][a-zA-Z0-9+.-]*:")) then empty
+        elif ($value | test("[\\\\\\s]")) then empty
+        else ($origin + "/" + ($value | sub("^/+"; ""))) end;
+      def person($p):
+        if ($p | type) == "string" then $p
+        elif ($p | type) == "object" then
+          ([$p.user, $p.member, $p.profile] | map(select(type == "object")) | .[0] // {}) as $src
+          | text($src; ["name","displayName","username","handle"]) as $nested
+          | if $nested != "" then $nested
+            else text($p; ["name","displayName","username","handle"]) end
+        else "" end;
+      def people($v):
+        if ($v | type) == "array" then [$v[] | person(.) | select(. != "")]
+        elif ($v | type) == "object" then
+          (if ([$v.participants, $v.members, $v.users, $v.matches] | map(select(type == "array")) | length) > 0
+           then [[$v.participants, $v.members, $v.users, $v.matches][] | select(type == "array") | people(.)[]]
+           else [person($v) | select(. != "")] end)
+        else [] end;
+      def list($p; $keys):
+        if ($p | type) != "object" then []
+        else ($keys | map($p[.] | select(type == "array")) | .[0] // []) end;
+      def sessions($raw; $matched; $t):
+        [
+          $raw[]
+          | select(type == "object")
+          | . as $e
+          | (if ($e.slot | type) == "object" then $e.slot else {} end) as $slot
+          | (text($e; ["id","sessionId","slotId"])) as $id
+          | select($id != "")
+          | (text($e; ["status","state"]) | ascii_upcase) as $status
+          | select($status != "ENDED" and $status != "CANCELED" and $status != "CANCELLED" and $status != "COMPLETED")
+          | ["startsAt","startAt","startTime","scheduledAt","slotStart","start"] as $sk
+          | ["endsAt","endAt","endTime","slotEnd","end"] as $ek
+          | (text($e; $sk) | if . == "" then text($slot; $sk) else . end) as $starts
+          | (text($e; $ek) | if . == "" then text($slot; $ek) else . end) as $base_ends
+          | (stamp($starts)) as $s
+          | select($s != null)
+          | ([$e.durationMinutes, $e.duration, $slot.durationMinutes] | map(select(type == "number" and . > 0)) | .[0] // null) as $minutes
+          | (stamp($base_ends) // (if $minutes != null then $s + $minutes * 60 else null end)) as $f
+          | (if $base_ends != "" then $base_ends elif $f != null then ($f | todateiso8601) else "" end) as $ends
+          | select(if $f != null then $f > $t else $s >= $t end)
+          | ([$e.host, $e.owner, $e.creator, $e.createdBy, $e.organizer] | map(person(.) | select(. != "")) | .[0]
+             // text($e; ["hostName","ownerName","creatorName"])) as $host
+          | ([
+               people($e.participants), people($e.members), people($e.attendees),
+               people($e.matches), people($e.partner), people($e.partners), people($e.match),
+               (if ($matched | type) == "object" then
+                  ([$id, $starts, text($e; ["slotId"]), text($slot; ["id"])]
+                   | map(select(. != "") | $matched[.] | select(. != null)) | .[0] // null | people(.))
+                else [] end)
+             ] | add | map(select(. != $host))
+             | reduce .[] as $n ([]; if index($n) then . else . + [$n] end)
+             | .[0:8]) as $people
+          | {
+              id: $id,
+              title: (text($e; ["title","name","topic","label"])
+                | if . == "" then text($slot; ["title","name","label"]) else . end
+                | if . == "" then "Coworking session" else . end),
+              host: $host,
+              people: $people,
+              startsAt: $starts,
+              endsAt: $ends,
+              isLive: ($s <= $t),
+              url: (
+                [text($e; ["href","url","webUrl","permalink","link"])]
+                | map(resolve(.))
+                | .[0] // ($origin + "/coworking")
+              ),
+              _s: $s
+            }
+        ]
+        | unique_by(.id + "|" + .startsAt)
+        | sort_by(._s)
+        | map(del(._s))
+        | .[0:$limit];
+      (unwrap) as $p
+      # The server clock wins, so a wrong local clock does not hide sessions.
+      | (stamp(text($p; ["serverNow","now"]))
+         // (if $now != "" then ($now | tonumber) else now end)) as $t
+      | (if ($p | type) == "object" then $p.matchedBySlot else null end) as $matched
+      | (if ($p | type) == "array" then $p else list($p; ["openSessions","open","sessions","items","results"]) end) as $open
+      | (sessions(list($p; ["mySessions","mine","booked"]); $matched; $t)) as $mine
+      | {
+          ok: true,
+          mine: $mine,
+          # A session you booked is listed once, under yours.
+          open: [sessions($open; $matched; $t)[] | select(. as $o | ($mine | map(.id + "|" + .startsAt) | index($o.id + "|" + $o.startsAt)) == null)]
+        }
+    end
+  '
+}
+
+cmd_coworking_calendar() {
+  local n="$feed_limit" window payload
+  if (( n < 1 )); then
+    n=1
+  elif (( n > 50 )); then
+    n=50
+  fi
+  # The site asks coworking.calendar for the next 15 days.
+  window="$(jq -nc --arg now "${TINKERER_NOW:-}" '
+    (if $now != "" then ($now | tonumber) else now end | floor) as $t
+    | {from: ($t | todateiso8601), to: (($t + 15 * 86400) | todateiso8601)}
+  ')"
+  payload="$(api_call "coworking/calendar" "$window")"
+  printf '%s' "$payload" | unwrap_coworking "$n"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base-url)
@@ -899,6 +1032,13 @@ case "$command" in
       live) cmd_events_live ;;
       upcoming) cmd_events_upcoming ;;
       "") fail "Unknown command: events" ;;
+      *) fail "Unknown command: $2" ;;
+    esac
+    ;;
+  coworking)
+    case "${2:-}" in
+      calendar) cmd_coworking_calendar ;;
+      "") fail "Unknown command: coworking" ;;
       *) fail "Unknown command: $2" ;;
     esac
     ;;

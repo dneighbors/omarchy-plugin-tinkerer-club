@@ -69,9 +69,22 @@ Panel {
   property var events: []
   property string eventsErrorText: ""
   property string eventsStatusHint: ""
+  property var coworkingMine: []
+  property var coworkingOpen: []
+  property string coworkingErrorText: ""
+  property string coworkingStatusHint: ""
+  // One list for the Coworking tab: a heading row, then that group's sessions.
+  readonly property var coworkingRows: {
+    var rows = []
+    if (coworkingMine.length > 0)
+      rows = rows.concat([{ heading: "Your sessions" }], coworkingMine)
+    if (coworkingOpen.length > 0)
+      rows = rows.concat([{ heading: "Open sessions" }], coworkingOpen)
+    return rows
+  }
   // Drop a previously fetched live event once the key goes away, since
   // refreshLive() stops running while unconfigured.
-  onConfiguredChanged: if (!configured) { liveEvent = null; events = [] }
+  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = [] }
   readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
   readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
@@ -87,11 +100,12 @@ Panel {
   readonly property bool hasNew: latestId !== "" && seenId !== "" && latestId !== seenId
   readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running
     : root.panelView === "events" ? eventsProc.running
+    : root.panelView === "coworking" ? coworkingProc.running
     : (root.panelView === "lockin"
       ? (stateProc.running || startProc.running || finishProc.running || todosProc.running
         || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
       : feedProc.running)
-  readonly property bool busy: liveProc.running || eventsProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
+  readonly property bool busy: liveProc.running || eventsProc.running || coworkingProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
 
   // One entry per view: `label` is what the tab shows, `name` is the longer
   // name read by screen readers and shown in the tooltip.
@@ -99,6 +113,7 @@ Panel {
     { view: "feed", label: "Feed", name: "Feed: recent posts" },
     { view: "notifications", label: "Notifications", name: "Notifications: your unread and recent" },
     { view: "events", label: "Events", name: "Events: upcoming club events" },
+    { view: "coworking", label: "Coworking", name: "Coworking: your booked and the open sessions" },
     { view: "lockin", label: "LockIn", name: "LockIn: co-working session and checklist" }
   ]
 
@@ -108,6 +123,8 @@ Panel {
       root.refreshNotifications()
     } else if (view === "events") {
       root.refreshEvents()
+    } else if (view === "coworking") {
+      root.refreshCoworking()
     } else if (view === "lockin") {
       root.refreshLockinState()
       root.refreshLockinTodos()
@@ -165,6 +182,9 @@ Panel {
     } else if (root.panelView === "events") {
       errorText = eventsErrorText
       statusHint = eventsStatusHint
+    } else if (root.panelView === "coworking") {
+      errorText = coworkingErrorText
+      statusHint = coworkingStatusHint
     } else {
       errorText = feedErrorText
       statusHint = feedStatusHint
@@ -310,6 +330,60 @@ Panel {
     return Qt.formatDateTime(new Date(stamp), "ddd MMM d \u00b7 h:mm AP")
   }
 
+  function refreshCoworking() {
+    if (!coworkingProc.running) {
+      coworkingProc.command = root.cmd(["coworking", "calendar"])
+      coworkingProc.running = true
+    }
+  }
+
+  function applyCoworking(data) {
+    if (data && data.ok === true && Array.isArray(data.mine) && Array.isArray(data.open)) {
+      root.coworkingMine = data.mine
+      root.coworkingOpen = data.open
+      coworkingErrorText = ""
+      coworkingStatusHint = ""
+    } else {
+      coworkingErrorText = (data && data.error) || "Could not load coworking sessions."
+      coworkingStatusHint = (data && data.hint) || ""
+    }
+    if (root.panelView === "coworking") {
+      errorText = coworkingErrorText
+      statusHint = coworkingStatusHint
+    }
+  }
+
+  function coworkingPageUrl() {
+    var base = String(root.baseUrl).replace(/\/+$/, "")
+    return base + "/coworking"
+  }
+
+  // A session link is opened only when it is http(s) on the configured
+  // origin; anything else goes to the coworking page.
+  function coworkingSafeUrl(url) {
+    var base = String(root.baseUrl).replace(/\/+$/, "")
+    var value = String(url === undefined || url === null ? "" : url)
+    if (/^https?:\/\//i.test(base) && /^https?:\/\//i.test(value)
+        && (value === base || value.indexOf(base + "/") === 0))
+      return value
+    return root.coworkingPageUrl()
+  }
+
+  function openCoworking(url) {
+    root.openUrl(root.coworkingSafeUrl(url))
+  }
+
+  // Who is in a session, when the API says: "Hosted by Ada · with Sam, Lee".
+  function coworkingWho(session) {
+    if (!session) return ""
+    var parts = []
+    var host = String(session.host || "")
+    if (host !== "") parts.push("Hosted by " + host)
+    var people = Array.isArray(session.people) ? session.people.filter(function(name) { return name }) : []
+    if (people.length > 0) parts.push("with " + people.join(", "))
+    return parts.join(" \u00b7 ")
+  }
+
   function refreshLockinTodos() {
     if (!todosProc.running) {
       todosProc.command = root.cmd(["lockin", "todos"])
@@ -445,6 +519,8 @@ Panel {
       root.refreshLockinTodos()
     } else if (root.opened && root.panelView === "events")
       root.refreshEvents()
+    else if (root.opened && root.panelView === "coworking")
+      root.refreshCoworking()
     else
       root.refreshFeed()
   }
@@ -698,6 +774,17 @@ Panel {
         var data
         try { data = JSON.parse(text) } catch (e) { return }
         root.applyEvents(data)
+      }
+    }
+  }
+
+  Process {
+    id: coworkingProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyCoworking(data)
       }
     }
   }
@@ -1300,6 +1387,137 @@ Panel {
                 }
               }
             }
+          }
+        }
+
+        Flickable {
+          id: coworkingFlick
+          width: parent.width
+          height: Math.min(coworkingColumn.implicitHeight, root.listMaxHeight)
+          contentWidth: width
+          contentHeight: coworkingColumn.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          flickableDirection: Flickable.VerticalFlick
+          visible: root.panelView === "coworking" && root.coworkingRows.length > 0
+
+          Column {
+            id: coworkingColumn
+            width: coworkingFlick.width
+            spacing: Style.space(6)
+
+            Repeater {
+              model: root.coworkingRows
+
+              delegate: Item {
+                id: coworkingItem
+                required property var modelData
+                readonly property bool isHeading: modelData.heading !== undefined
+                readonly property string who: root.plain(root.coworkingWho(modelData))
+                width: coworkingColumn.width
+                height: isHeading
+                  ? coworkingHeading.implicitHeight + Style.space(4)
+                  : coworkingRow.implicitHeight + Style.space(8)
+
+                Text {
+                  id: coworkingHeading
+                  visible: coworkingItem.isHeading
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: root.plain(coworkingItem.isHeading ? coworkingItem.modelData.heading : "")
+                  color: root.mutedForeground
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: true
+                  elide: Text.ElideRight
+                }
+
+                Rectangle {
+                  anchors.fill: parent
+                  visible: !coworkingItem.isHeading
+                  radius: Style.space(4)
+                  color: coworkingMouse.containsMouse
+                    ? Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+                    : "transparent"
+                }
+
+                MouseArea {
+                  id: coworkingMouse
+                  anchors.fill: parent
+                  enabled: !coworkingItem.isHeading
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openCoworking(modelData.url)
+                }
+
+                Column {
+                  id: coworkingRow
+                  visible: !coworkingItem.isHeading
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.margins: Style.space(8)
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(root.eventWhen(modelData.startsAt, modelData.isLive === true))
+                    color: modelData.isLive === true ? Color.urgent : root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    font.bold: modelData.isLive === true
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(root.snippet(modelData.title || "Coworking session", 90))
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    visible: coworkingItem.who !== ""
+                    textFormat: Text.PlainText
+                    text: root.plain(root.coworkingWho(modelData))
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        Text {
+          width: parent.width
+          visible: root.panelView === "coworking" && root.configured && root.coworkingRows.length === 0 && !root.viewBusy && root.errorText === ""
+          text: "No coworking sessions scheduled."
+          color: root.mutedForeground
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        WidgetButton {
+          width: parent.width
+          visible: root.panelView === "coworking" && root.configured
+          bar: root.bar
+          text: "Open Coworking on web"
+          tooltipText: "Book, join or cancel a session on the site"
+          onPressed: function(buttonCode) {
+            if (buttonCode === Qt.LeftButton)
+              root.openUrl(root.coworkingPageUrl())
           }
         }
 

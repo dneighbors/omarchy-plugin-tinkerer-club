@@ -1,0 +1,9 @@
+{"path":"coworking.calendar","data":{"serverNow":"2026-11-21T19:00:00.000Z","matchedBySlot":{},"matchedCount":0,
+ "mySessions":[],
+ "openSessions":[
+  {"id":"cw-js","title":"Script link","startsAt":"2026-11-22T10:00:00.000Z","endsAt":"2026-11-22T11:00:00.000Z","url":"javascript:alert(1)"},
+  {"id":"cw-other","title":"Other site","startsAt":"2026-11-22T11:00:00.000Z","endsAt":"2026-11-22T12:00:00.000Z","url":"https://evil.test.invalid/coworking/x"},
+  {"id":"cw-lookalike","title":"Lookalike","startsAt":"2026-11-22T12:00:00.000Z","endsAt":"2026-11-22T13:00:00.000Z","url":"https://cw.test.invalid@evil.test.invalid/x"},
+  {"id":"cw-slashes","title":"Protocol relative","startsAt":"2026-11-22T13:00:00.000Z","endsAt":"2026-11-22T14:00:00.000Z","url":"//evil.test.invalid/x"},
+  {"id":"cw-file","title":"File link","startsAt":"2026-11-22T14:00:00.000Z","endsAt":"2026-11-22T15:00:00.000Z","link":"file:///etc/passwd"}
+ ]}}
