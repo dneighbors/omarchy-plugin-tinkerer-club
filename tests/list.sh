@@ -521,7 +521,7 @@ if grep -q 'property var notifications: \[\]' "$panel"; then
 else
   bad "Panel notifications model"
 fi
-if grep -q 'text: "Feed"' "$panel" && grep -q 'text: "Notifications"' "$panel"; then
+if grep -q 'label: "Feed"' "$panel" && grep -q 'label: "Notifications"' "$panel"; then
   pass "Panel Feed|Notifications switcher"
 else
   bad "Panel Feed|Notifications switcher"

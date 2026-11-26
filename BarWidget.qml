@@ -60,10 +60,33 @@ BarWidget {
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
 
+  // The shell caches a QML file by its URL for as long as it runs, so after
+  // `omarchy plugin update` a plain "Panel.qml" would keep serving the old
+  // panel. Keying the URL by the file's contents makes a rebuilt widget load
+  // the panel that is on disk now.
+  property string panelSource: ""
+
+  function contentStamp(text) {
+    var h = 5381
+    for (var i = 0; i < text.length; i++)
+      h = ((h * 33) ^ text.charCodeAt(i)) >>> 0
+    return h.toString(16)
+  }
+
+  FileView {
+    id: panelFile
+    path: Qt.resolvedUrl("Panel.qml").toString().replace(/^file:\/\//, "")
+    blockLoading: true
+    printErrors: false
+    onLoaded: root.panelSource =
+      Qt.resolvedUrl("Panel.qml") + "?v=" + root.contentStamp(panelFile.text())
+    onLoadFailed: root.panelSource = Qt.resolvedUrl("Panel.qml")
+  }
+
   Loader {
     id: panelLoader
-    active: true
-    source: Qt.resolvedUrl("Panel.qml")
+    active: root.panelSource !== ""
+    source: root.panelSource
     visible: false
     onLoaded: {
       root.injectPanel()
