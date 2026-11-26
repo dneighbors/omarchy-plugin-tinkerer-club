@@ -1,0 +1,105 @@
+{
+  "ok": true,
+  "total": 9,
+  "jobs": [
+    {
+      "id": "j-js",
+      "title": "Script link",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T06:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "j-off",
+      "title": "Off origin",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T05:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "j-lookalike",
+      "title": "Lookalike origin",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T04:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "j-file",
+      "title": "File link",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T03:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "j-slash",
+      "title": "Backslash",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T02:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "j-proto",
+      "title": "Protocol relative",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T01:30:00Z",
+      "url": "https://jobs.test.invalid/evil.example/jobs"
+    },
+    {
+      "id": "j-rel",
+      "title": "Relative path",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T01:00:00Z",
+      "url": "https://jobs.test.invalid/jobs/j-rel"
+    },
+    {
+      "id": "j-own",
+      "title": "Own origin",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T00:30:00Z",
+      "url": "https://jobs.test.invalid/jobs/j-own"
+    },
+    {
+      "id": "j-apply",
+      "title": "Apply link is not the job link",
+      "company": "",
+      "poster": "",
+      "workplace": "",
+      "location": "",
+      "employmentType": "",
+      "postedAt": "2026-11-20T00:00:00Z",
+      "url": "https://jobs.test.invalid/jobs"
+    }
+  ]
+}

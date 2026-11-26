@@ -1,0 +1,1 @@
+{"code":"BAD_REQUEST","error":"[\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"HIRING\",\n      \"SEEKING\"\n    ],\n    \"path\": [\n      \"kind\"\n    ],\n    \"message\": \"Invalid option: expected one of \\\"HIRING\\\"|\\\"SEEKING\\\"\"\n  }\n]","path":"jobs.browse"}

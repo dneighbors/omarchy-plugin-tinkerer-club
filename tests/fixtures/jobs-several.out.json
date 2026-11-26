@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "total": 4,
+  "jobs": [
+    {
+      "id": "job-new",
+      "title": "Product Designer <b>urgent</b>",
+      "company": "",
+      "poster": "Sam Lee",
+      "workplace": "Remote, Hybrid",
+      "location": "Lisbon, Portugal",
+      "employmentType": "Freelance, Contract",
+      "postedAt": "2026-11-20T12:30:00.000Z",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "job-mid",
+      "title": "Support Tinkerer",
+      "company": "Bench Co",
+      "poster": "benchbot",
+      "workplace": "Remote",
+      "location": "",
+      "employmentType": "Part time",
+      "postedAt": "2026-11-10T09:15:00+02:00",
+      "url": "https://jobs.test.invalid/jobs"
+    },
+    {
+      "id": "job-old",
+      "title": "Firmware Engineer",
+      "company": "Solder & Sons",
+      "poster": "Ada Byron",
+      "workplace": "Onsite",
+      "location": "Austin, United States",
+      "employmentType": "Full time",
+      "postedAt": "2026-11-01T08:00:00.000Z",
+      "url": "https://jobs.test.invalid/jobs"
+    }
+  ]
+}

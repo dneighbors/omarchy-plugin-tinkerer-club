@@ -83,6 +83,9 @@ Panel {
   }
   property string coworkingErrorText: ""
   property string coworkingStatusHint: ""
+  property var jobs: []
+  property string jobsErrorText: ""
+  property string jobsStatusHint: ""
   // One list for the Coworking tab: a heading row, then that group's sessions.
   readonly property var coworkingRows: {
     var rows = []
@@ -94,7 +97,7 @@ Panel {
   }
   // Drop a previously fetched live event once the key goes away, since
   // refreshLive() stops running while unconfigured.
-  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = []; coworkingCue = null }
+  onConfiguredChanged: if (!configured) { liveEvent = null; events = []; coworkingMine = []; coworkingOpen = []; coworkingCue = null; jobs = [] }
   readonly property bool liveNow: liveEvent !== null && liveEvent.isLive === true
   readonly property string liveTitle: liveEvent ? String(liveEvent.title || "Live session") : ""
   readonly property bool lockinLive: lockinCurrent !== null
@@ -111,11 +114,12 @@ Panel {
   readonly property bool viewBusy: root.panelView === "notifications" ? listProc.running
     : root.panelView === "events" ? eventsProc.running
     : root.panelView === "coworking" ? coworkingProc.running
+    : root.panelView === "jobs" ? jobsProc.running
     : (root.panelView === "lockin"
       ? (stateProc.running || startProc.running || finishProc.running || todosProc.running
         || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running)
       : feedProc.running)
-  readonly property bool busy: liveProc.running || eventsProc.running || coworkingProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
+  readonly property bool busy: liveProc.running || eventsProc.running || coworkingProc.running || jobsProc.running || statusProc.running || feedProc.running || unreadProc.running || listProc.running || markReadProc.running || markAllReadProc.running || stateProc.running || startProc.running || finishProc.running || todosProc.running || todoAddProc.running || todoUpdateProc.running || todoDeleteProc.running
 
   // One entry per view: `label` is what the tab shows, `name` is the longer
   // name read by screen readers and shown in the tooltip.
@@ -124,6 +128,7 @@ Panel {
     { view: "notifications", label: "Notifications", name: "Notifications: your unread and recent" },
     { view: "events", label: "Events", name: "Events: upcoming club events" },
     { view: "coworking", label: "Coworking", name: "Coworking: your booked and the open sessions" },
+    { view: "jobs", label: "Jobs", name: "Jobs: open hiring posts" },
     { view: "lockin", label: "LockIn", name: "LockIn: co-working session and checklist" }
   ]
 
@@ -135,6 +140,8 @@ Panel {
       root.refreshEvents()
     } else if (view === "coworking") {
       root.refreshCoworking()
+    } else if (view === "jobs") {
+      root.refreshJobs()
     } else if (view === "lockin") {
       root.refreshLockinState()
       root.refreshLockinTodos()
@@ -195,6 +202,9 @@ Panel {
     } else if (root.panelView === "coworking") {
       errorText = coworkingErrorText
       statusHint = coworkingStatusHint
+    } else if (root.panelView === "jobs") {
+      errorText = jobsErrorText
+      statusHint = jobsStatusHint
     } else {
       errorText = feedErrorText
       statusHint = feedStatusHint
@@ -404,6 +414,59 @@ Panel {
     return parts.join(" \u00b7 ")
   }
 
+  function refreshJobs() {
+    if (!jobsProc.running) {
+      jobsProc.command = root.cmd(["jobs", "browse"])
+      jobsProc.running = true
+    }
+  }
+
+  function applyJobs(data) {
+    if (data && data.ok === true && Array.isArray(data.jobs)) {
+      root.jobs = data.jobs
+      jobsErrorText = ""
+      jobsStatusHint = ""
+    } else {
+      jobsErrorText = (data && data.error) || "Could not load jobs."
+      jobsStatusHint = (data && data.hint) || ""
+    }
+    if (root.panelView === "jobs") {
+      errorText = jobsErrorText
+      statusHint = jobsStatusHint
+    }
+  }
+
+  function jobsPageUrl() {
+    var base = String(root.baseUrl).replace(/\/+$/, "")
+    return base + "/jobs"
+  }
+
+  // A job link is opened only when it is http(s) on the configured origin;
+  // anything else goes to the jobs page.
+  function jobSafeUrl(url) {
+    var base = String(root.baseUrl).replace(/\/+$/, "")
+    var value = String(url === undefined || url === null ? "" : url)
+    if (/^https?:\/\//i.test(base) && /^https?:\/\//i.test(value)
+        && (value === base || value.indexOf(base + "/") === 0))
+      return value
+    return root.jobsPageUrl()
+  }
+
+  function openJob(url) {
+    root.openUrl(root.jobSafeUrl(url))
+  }
+
+  // The second line of a job row: "Acme \u00b7 Remote \u00b7 Full time". The poster
+  // stands in when no company is named, the location when no workplace is.
+  function jobDetail(job) {
+    if (!job) return ""
+    return [
+      String(job.company || job.poster || ""),
+      String(job.workplace || job.location || ""),
+      String(job.employmentType || "")
+    ].filter(function(part) { return part }).join(" \u00b7 ")
+  }
+
   function refreshLockinTodos() {
     if (!todosProc.running) {
       todosProc.command = root.cmd(["lockin", "todos"])
@@ -541,6 +604,8 @@ Panel {
       root.refreshEvents()
     else if (root.opened && root.panelView === "coworking")
       root.refreshCoworking()
+    else if (root.opened && root.panelView === "jobs")
+      root.refreshJobs()
     else
       root.refreshFeed()
   }
@@ -806,6 +871,17 @@ Panel {
         var data
         try { data = JSON.parse(text) } catch (e) { return }
         root.applyCoworking(data)
+      }
+    }
+  }
+
+  Process {
+    id: jobsProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var data
+        try { data = JSON.parse(text) } catch (e) { return }
+        root.applyJobs(data)
       }
     }
   }
@@ -1541,6 +1617,117 @@ Panel {
           onPressed: function(buttonCode) {
             if (buttonCode === Qt.LeftButton)
               root.openUrl(root.coworkingPageUrl())
+          }
+        }
+
+        Flickable {
+          id: jobsFlick
+          width: parent.width
+          height: Math.min(jobsColumn.implicitHeight, root.listMaxHeight)
+          contentWidth: width
+          contentHeight: jobsColumn.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          flickableDirection: Flickable.VerticalFlick
+          visible: root.panelView === "jobs" && root.jobs.length > 0
+
+          Column {
+            id: jobsColumn
+            width: jobsFlick.width
+            spacing: Style.space(6)
+
+            Repeater {
+              model: root.jobs
+
+              delegate: Item {
+                id: jobItem
+                required property var modelData
+                readonly property string detail: root.plain(root.jobDetail(modelData))
+                readonly property string age: root.plain(root.relativeTime(modelData.postedAt))
+                width: jobsColumn.width
+                height: jobRow.implicitHeight + Style.space(8)
+
+                Rectangle {
+                  anchors.fill: parent
+                  radius: Style.space(4)
+                  color: jobMouse.containsMouse
+                    ? Style.hoverFillFor(root.contentForeground, Color.accent, Color.urgent)
+                    : "transparent"
+                }
+
+                MouseArea {
+                  id: jobMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openJob(modelData.url)
+                }
+
+                Column {
+                  id: jobRow
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.margins: Style.space(8)
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: root.plain(root.snippet(modelData.title || "Job post", 90))
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    visible: jobItem.detail !== ""
+                    textFormat: Text.PlainText
+                    text: root.plain(root.jobDetail(modelData))
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    visible: jobItem.age !== ""
+                    textFormat: Text.PlainText
+                    text: root.plain(root.relativeTime(modelData.postedAt))
+                    color: root.mutedForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        Text {
+          width: parent.width
+          visible: root.panelView === "jobs" && root.configured && root.jobs.length === 0 && !root.viewBusy && root.errorText === ""
+          text: "No open job posts."
+          color: root.mutedForeground
+          font.family: root.contentFontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        WidgetButton {
+          width: parent.width
+          visible: root.panelView === "jobs" && root.configured
+          bar: root.bar
+          text: "Open Jobs on web"
+          tooltipText: "Post, apply or filter on the site"
+          onPressed: function(buttonCode) {
+            if (buttonCode === Qt.LeftButton)
+              root.openUrl(root.jobsPageUrl())
           }
         }
 

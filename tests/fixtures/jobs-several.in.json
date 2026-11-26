@@ -1,0 +1,68 @@
+{
+  "data": {
+    "items": [
+      {
+        "id": "job-old",
+        "authorId": "u1",
+        "kind": "HIRING",
+        "status": "OPEN",
+        "title": "Firmware Engineer",
+        "company": "Solder & Sons",
+        "companyUrl": "https://solder.example",
+        "description": "Bring up boards.",
+        "skills": ["C", "Rust"],
+        "seniority": "SENIOR",
+        "employmentTypes": ["FULL_TIME"],
+        "workplaces": ["ONSITE"],
+        "city": "Austin",
+        "countryCode": "US",
+        "countryName": "United States",
+        "compensation": "$150k",
+        "applyUrl": "https://solder.example/apply",
+        "closedAt": null,
+        "createdAt": "2026-11-01T08:00:00.000Z",
+        "updatedAt": "2026-11-02T08:00:00.000Z",
+        "author": {"id": "u1", "name": "Ada Byron", "username": "ada"},
+        "location": {"city": "Austin", "countryCode": "US", "countryName": "United States"}
+      },
+      {
+        "id": "job-new",
+        "kind": "HIRING",
+        "status": "OPEN",
+        "title": "Product Designer <b>urgent</b>",
+        "company": null,
+        "employmentTypes": ["FREELANCE", "CONTRACT"],
+        "workplaces": ["REMOTE", "HYBRID"],
+        "city": null,
+        "countryName": null,
+        "closedAt": null,
+        "createdAt": "2026-11-20T12:30:00.000Z",
+        "author": {"id": "u2", "name": "Sam Lee", "username": "sam"},
+        "location": {"city": "Lisbon", "countryCode": "PT", "countryName": "Portugal"}
+      },
+      {
+        "id": "job-closed",
+        "kind": "HIRING",
+        "status": "CLOSED",
+        "title": "Already filled",
+        "company": "Gone Inc",
+        "closedAt": "2026-11-19T00:00:00.000Z",
+        "createdAt": "2026-11-18T00:00:00.000Z"
+      },
+      {
+        "id": "job-mid",
+        "kind": "HIRING",
+        "status": "OPEN",
+        "title": "Support Tinkerer",
+        "company": "Bench Co",
+        "employmentTypes": ["PART_TIME"],
+        "workplaces": ["REMOTE"],
+        "closedAt": null,
+        "createdAt": "2026-11-10T09:15:00+02:00",
+        "author": {"name": "", "username": "benchbot"}
+      }
+    ],
+    "total": 4
+  },
+  "path": "jobs.browse"
+}
